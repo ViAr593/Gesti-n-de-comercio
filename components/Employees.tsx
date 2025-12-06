@@ -1,4 +1,6 @@
 
+
+
 import React, { useState } from 'react';
 import { Employee } from '../types';
 import { Plus, Edit, Trash2, Shield, User, Briefcase, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
@@ -97,6 +99,8 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 border border-purple-200">Gerente General</span>;
       case 'ADMINISTRADOR':
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">Administrador</span>;
+      case 'BODEGUERO':
+        return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">Bodeguero</span>;
       default:
         return <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">Vendedor</span>;
     }
@@ -228,6 +232,7 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
                     className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none bg-white"
                   >
                     <option value="VENDEDOR">Vendedor</option>
+                    <option value="BODEGUERO">Bodeguero (Solo Stock)</option>
                     <option value="ADMINISTRADOR">Administrador</option>
                     <option value="GERENTE_GENERAL">Gerente General</option>
                   </select>

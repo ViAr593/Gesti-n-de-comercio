@@ -1,6 +1,10 @@
 
+
+
+
+
 import React, { useState, useEffect } from 'react';
-import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation, BusinessConfig } from './types';
+import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation, BusinessConfig, InventoryLog } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { Inventory } from './components/Inventory';
@@ -11,13 +15,13 @@ import { Expenses } from './components/Expenses';
 import { Customers } from './components/Customers';
 import { Employees } from './components/Employees';
 import { Tools } from './components/Tools';
-import { Settings } from './components/Settings'; // New Import
+import { Settings } from './components/Settings'; 
 import { Login } from './components/Login';
 import { Menu } from 'lucide-react';
 import { db } from './services/db'; 
 
 const App: React.FC = () => {
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
@@ -30,6 +34,7 @@ const App: React.FC = () => {
   const [expenses, setExpenses] = useState<Expense[]>(() => db.expenses.getAll());
   const [quotations, setQuotations] = useState<Quotation[]>(() => db.quotations.getAll());
   const [businessConfig, setBusinessConfig] = useState<BusinessConfig>(() => db.config.get());
+  const [inventoryLogs, setInventoryLogs] = useState<InventoryLog[]>(() => db.logs.getAll());
 
   // -- PERSIST CHANGES TO DB SERVICE --
   useEffect(() => { db.products.set(products); }, [products]);
@@ -40,6 +45,16 @@ const App: React.FC = () => {
   useEffect(() => { db.employees.set(employees); }, [employees]);
   useEffect(() => { db.quotations.set(quotations); }, [quotations]);
   useEffect(() => { db.config.set(businessConfig); }, [businessConfig]);
+  useEffect(() => { db.logs.set(inventoryLogs); }, [inventoryLogs]);
+
+  // -- APPLY THEME --
+  useEffect(() => {
+    if (businessConfig.theme === 'dark') {
+        document.documentElement.classList.add('dark');
+    } else {
+        document.documentElement.classList.remove('dark');
+    }
+  }, [businessConfig.theme]);
 
   // -- BUSINESS LOGIC --
   const handleCompleteSale = (newSale: Sale) => {
@@ -48,6 +63,19 @@ const App: React.FC = () => {
     setProducts(prevProducts => prevProducts.map(p => {
       const itemInCart = newSale.items.find(item => item.id === p.id);
       if (itemInCart) {
+        // Log the automatic stock reduction
+        const log: InventoryLog = {
+          id: crypto.randomUUID(),
+          date: new Date().toISOString(),
+          productId: p.id,
+          productName: p.name,
+          type: 'VENTA',
+          quantity: -itemInCart.quantity,
+          userId: currentUser?.id || 'system',
+          userName: currentUser?.name || 'Sistema POS'
+        };
+        setInventoryLogs(prev => [log, ...prev]);
+
         return { ...p, stock: p.stock - itemInCart.quantity };
       }
       return p;
@@ -65,7 +93,14 @@ const App: React.FC = () => {
       case 'DASHBOARD':
         return <Dashboard sales={sales} expenses={expenses} products={products} />;
       case 'INVENTORY':
-        return <Inventory products={products} suppliers={suppliers} setProducts={setProducts} />;
+        return <Inventory 
+          products={products} 
+          suppliers={suppliers} 
+          setProducts={setProducts} 
+          inventoryLogs={inventoryLogs}
+          setInventoryLogs={setInventoryLogs}
+          currentUser={currentUser} // Pass current user for RBAC and logging
+        />;
       case 'POS':
         return <POS 
           products={products} 
@@ -95,14 +130,14 @@ const App: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+  if (!currentUser) {
+    return <Login onLoginSuccess={(user) => setCurrentUser(user)} />;
   }
 
   return (
-    <div className="flex h-[100dvh] bg-slate-50 text-slate-900 font-sans overflow-hidden">
+    <div className="flex h-[100dvh] bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans overflow-hidden transition-colors duration-300">
       {/* Mobile Header */}
-      <div className="md:hidden fixed w-full top-0 z-30 bg-white text-slate-800 p-4 flex justify-between items-center shadow-sm border-b border-slate-200 h-16">
+      <div className="md:hidden fixed w-full top-0 z-30 bg-white dark:bg-slate-800 text-slate-800 dark:text-white p-4 flex justify-between items-center shadow-sm border-b border-slate-200 dark:border-slate-700 h-16">
         <span className="font-bold text-lg flex items-center gap-2">
             <div className="w-6 h-6 bg-amber-400 rounded-md flex items-center justify-center text-xs overflow-hidden">
                  {businessConfig.logo ? <img src={businessConfig.logo} alt="Logo" className="w-full h-full object-cover" /> : "GP"}
@@ -127,7 +162,7 @@ const App: React.FC = () => {
       </div>
 
       {/* Main Content Area */}
-      <main className="flex-1 overflow-y-auto md:ml-64 pt-16 md:pt-0 h-full w-full relative">
+      <main className="flex-1 overflow-y-auto md:ml-64 pt-16 md:pt-0 h-full w-full relative custom-scrollbar">
         {renderView()}
       </main>
 

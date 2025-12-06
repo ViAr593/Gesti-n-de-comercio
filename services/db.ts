@@ -1,5 +1,4 @@
-
-import { Product, Supplier, Customer, Employee, Sale, Expense, Quotation, BusinessConfig } from '../types';
+import { Product, Supplier, Customer, Employee, Sale, Expense, Quotation, BusinessConfig, InventoryLog } from '../types';
 
 // Claves de almacenamiento (Storage Keys)
 const KEYS = {
@@ -11,6 +10,7 @@ const KEYS = {
   EXPENSES: 'gp_db_expenses',
   QUOTATIONS: 'gp_db_quotations',
   CONFIG: 'gp_db_config',
+  LOGS: 'gp_db_inventory_logs',
 };
 
 // Datos Semilla (Initial/Seed Data) para cuando la app inicia por primera vez
@@ -85,7 +85,8 @@ const SEED_DATA = {
     phone: '555-0000',
     email: 'contacto@negocio.com',
     receiptMessage: '¡Gracias por su compra!',
-    currencySymbol: '$'
+    currencySymbol: '$',
+    theme: 'light'
   } as BusinessConfig
 };
 
@@ -142,16 +143,29 @@ export const db = {
     get: () => load<BusinessConfig>(KEYS.CONFIG, SEED_DATA.config),
     set: (data: BusinessConfig) => save(KEYS.CONFIG, data),
   },
+  logs: {
+    getAll: () => load<InventoryLog[]>(KEYS.LOGS, []),
+    set: (data: InventoryLog[]) => save(KEYS.LOGS, data),
+  },
   auth: {
     // Validate credentials against the database
-    login: (email: string, pass: string): boolean => {
+    login: (email: string, pass: string): Employee | null => {
       // 1. Try hardcoded fallback if db fails or is empty, though seed data handles this.
-      if (email === 'admin' && pass === 'admin123') return true; 
+      if (email === 'admin' && pass === 'admin123') {
+        return {
+          id: 'admin_master',
+          name: 'Super Admin',
+          role: 'GERENTE_GENERAL',
+          email: 'admin',
+          phone: '',
+          password: ''
+        };
+      } 
 
       // 2. Check against stored employees
       const employees = load<Employee[]>(KEYS.EMPLOYEES, SEED_DATA.employees);
       const found = employees.find(e => e.email === email && e.password === pass);
-      return !!found;
+      return found || null;
     }
   }
 };

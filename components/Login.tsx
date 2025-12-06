@@ -1,10 +1,10 @@
-
 import React, { useState } from 'react';
 import { Lock, ArrowRight, User } from 'lucide-react';
 import { db } from '../services/db';
+import { Employee } from '../types';
 
 interface LoginProps {
-  onLoginSuccess: () => void;
+  onLoginSuccess: (user: Employee) => void;
 }
 
 export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
@@ -14,8 +14,9 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (db.auth.login(email, password)) {
-      onLoginSuccess();
+    const user = db.auth.login(email, password);
+    if (user) {
+      onLoginSuccess(user);
     } else {
       setError(true);
       setPassword('');

@@ -1,4 +1,5 @@
 
+
 export interface Product {
   id: string;
   name: string;
@@ -34,7 +35,7 @@ export interface Customer {
 export interface Employee {
   id: string;
   name: string;
-  role: 'VENDEDOR' | 'ADMINISTRADOR' | 'GERENTE_GENERAL';
+  role: 'VENDEDOR' | 'ADMINISTRADOR' | 'GERENTE_GENERAL' | 'BODEGUERO';
   phone: string;
   email: string;
   password?: string; // Optional for legacy data, required for new
@@ -82,6 +83,18 @@ export interface BusinessConfig {
   receiptMessage: string;
   currencySymbol: string;
   logo?: string; // Base64 string
+  theme?: 'light' | 'dark';
+}
+
+export interface InventoryLog {
+  id: string;
+  date: string;
+  productId: string;
+  productName: string;
+  type: 'ENTRADA' | 'VENTA' | 'AJUSTE' | 'ELIMINACION';
+  quantity: number;
+  userId: string;
+  userName: string;
 }
 
 export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES' | 'TOOLS' | 'SETTINGS';

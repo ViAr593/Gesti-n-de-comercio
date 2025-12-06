@@ -1,27 +1,47 @@
 
+
+
 import React, { useState } from 'react';
-import { Product, Supplier } from '../types';
-import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon, Upload, X } from 'lucide-react';
+import { Product, Supplier, InventoryLog, Employee } from '../types';
+import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon, Upload, X, Filter, RefreshCw, ClipboardList, ArrowUpCircle } from 'lucide-react';
 import { generateProductDescription } from '../services/gemini';
 
 interface InventoryProps {
   products: Product[];
   suppliers: Supplier[];
   setProducts: (products: Product[]) => void;
+  inventoryLogs?: InventoryLog[];
+  setInventoryLogs?: React.Dispatch<React.SetStateAction<InventoryLog[]>>;
+  currentUser: Employee | null;
 }
 
-export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setProducts }) => {
+export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setProducts, inventoryLogs = [], setInventoryLogs, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [showOrderPreview, setShowOrderPreview] = useState(false);
+  const [showAuditLog, setShowAuditLog] = useState(false); // Toggle for Audit Log View
   
   const [viewMode, setViewMode] = useState<'LIST' | 'CATALOG'>('LIST');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
   const [stockEntryValue, setStockEntryValue] = useState('');
+  const [stockType, setStockType] = useState<'ENTRY' | 'EXIT'>('ENTRY'); // To handle Bodeguero In/Out
   
+  // -- FILTER STATES --
   const [searchTerm, setSearchTerm] = useState('');
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterSupplier, setFilterSupplier] = useState('');
+  const [filterStock, setFilterStock] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH'>('ALL');
+
   const [isGenerating, setIsGenerating] = useState(false);
+
+  // Role Checks
+  const isManager = currentUser?.role === 'GERENTE_GENERAL';
+  const isAdminOrManager = currentUser?.role === 'ADMINISTRADOR' || currentUser?.role === 'GERENTE_GENERAL';
+  // Bodeguero can see list and manage stock, but cannot edit prices or create products
+  const canEditProduct = isAdminOrManager;
+  const canManageStock = isAdminOrManager || currentUser?.role === 'BODEGUERO';
 
   const initialFormState: Omit<Product, 'id'> = {
     name: '',
@@ -43,6 +63,9 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const totalInventoryCost = products.reduce((acc, p) => acc + (p.cost * p.stock), 0);
   const totalInventoryValue = products.reduce((acc, p) => acc + (p.price * p.stock), 0);
   const potentialProfit = totalInventoryValue - totalInventoryCost;
+
+  // Derive Unique Categories for Filter
+  const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort();
 
   const handleGenerateDescription = async () => {
     if (!formData.name || !formData.category) {
@@ -68,29 +91,103 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canEditProduct) return; // Guard for permission
+
+    // Capture Previous State for Log if Editing
+    const oldProduct = editingProduct ? products.find(p => p.id === editingProduct.id) : null;
+
     if (editingProduct) {
       setProducts(products.map(p => p.id === editingProduct.id ? { ...formData, id: p.id } : p));
+      
+      // Log manual adjustment if stock changed directly in form
+      if (oldProduct && oldProduct.stock !== formData.stock && setInventoryLogs) {
+          const diff = formData.stock - oldProduct.stock;
+          const log: InventoryLog = {
+            id: crypto.randomUUID(),
+            date: new Date().toISOString(),
+            productId: oldProduct.id,
+            productName: oldProduct.name,
+            type: diff > 0 ? 'ENTRADA' : 'AJUSTE',
+            quantity: diff,
+            userId: currentUser?.id || 'unknown',
+            userName: currentUser?.name || 'Unknown'
+          };
+          setInventoryLogs(prev => [log, ...prev]);
+      }
+
     } else {
-      setProducts([...products, { ...formData, id: crypto.randomUUID() }]);
+      const newId = crypto.randomUUID();
+      const newProduct = { ...formData, id: newId };
+      setProducts([...products, newProduct]);
+      
+      // Log New Product Entry
+      if (setInventoryLogs && newProduct.stock > 0) {
+          const log: InventoryLog = {
+            id: crypto.randomUUID(),
+            date: new Date().toISOString(),
+            productId: newId,
+            productName: newProduct.name,
+            type: 'ENTRADA',
+            quantity: newProduct.stock,
+            userId: currentUser?.id || 'unknown',
+            userName: currentUser?.name || 'Unknown'
+          };
+          setInventoryLogs(prev => [log, ...prev]);
+      }
     }
     closeModal();
   };
 
-  const handleAddStock = (e: React.FormEvent) => {
+  const handleStockUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (!stockProduct) return;
     const qty = parseFloat(stockEntryValue);
     if (isNaN(qty) || qty <= 0) return;
 
-    setProducts(products.map(p => p.id === stockProduct.id ? { ...p, stock: p.stock + qty } : p));
+    // Apply multiplier based on Entry or Exit
+    const adjustment = stockType === 'ENTRY' ? qty : -qty;
+
+    setProducts(products.map(p => p.id === stockProduct.id ? { ...p, stock: p.stock + adjustment } : p));
+
+    // LOGGING
+    if (setInventoryLogs) {
+        const log: InventoryLog = {
+            id: crypto.randomUUID(),
+            date: new Date().toISOString(),
+            productId: stockProduct.id,
+            productName: stockProduct.name,
+            type: stockType === 'ENTRY' ? 'ENTRADA' : 'AJUSTE', // Entry vs Exit/Adjustment
+            quantity: adjustment,
+            userId: currentUser?.id || 'unknown',
+            userName: currentUser?.name || 'Unknown'
+        };
+        setInventoryLogs(prev => [log, ...prev]);
+    }
+
     setIsStockModalOpen(false);
     setStockProduct(null);
     setStockEntryValue('');
-    alert(`Se agregaron ${qty} unidades a ${stockProduct.name}`);
+    alert(`Stock actualizado: ${adjustment > 0 ? '+' : ''}${adjustment} unidades para ${stockProduct.name}`);
   };
 
   const handleDelete = (id: string) => {
+    if (!canEditProduct) return; // Guard
     if (confirm('¿Está seguro de eliminar este producto?')) {
+      const p = products.find(p => p.id === id);
+      if (p && setInventoryLogs) {
+         // Log Deletion
+         const log: InventoryLog = {
+            id: crypto.randomUUID(),
+            date: new Date().toISOString(),
+            productId: id,
+            productName: p.name,
+            type: 'ELIMINACION',
+            quantity: -p.stock, // Log removal of remaining stock
+            userId: currentUser?.id || 'unknown',
+            userName: currentUser?.name || 'Unknown'
+        };
+        setInventoryLogs(prev => [log, ...prev]);
+      }
       setProducts(products.filter(p => p.id !== id));
     }
   };
@@ -121,6 +218,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const openStockModal = (product: Product) => {
     setStockProduct(product);
     setStockEntryValue('');
+    setStockType('ENTRY'); // Reset to entry by default
     setIsStockModalOpen(true);
   };
 
@@ -130,13 +228,111 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
     setFormData(initialFormState);
   };
 
-  const filteredProducts = products.filter(p => 
-    p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    p.category.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const clearFilters = () => {
+    setSearchTerm('');
+    setFilterCategory('');
+    setFilterSupplier('');
+    setFilterStock('ALL');
+  };
+
+  // --- ADVANCED FILTERING LOGIC ---
+  const filteredProducts = products.filter(p => {
+    // 1. Text Search
+    const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          p.category.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // 2. Category Filter
+    const matchesCategory = filterCategory ? p.category === filterCategory : true;
+
+    // 3. Supplier Filter
+    const matchesSupplier = filterSupplier ? p.supplierId === filterSupplier : true;
+
+    // 4. Stock Level Filter
+    let matchesStock = true;
+    if (filterStock === 'LOW') {
+        matchesStock = p.stock <= p.minStock;
+    } else if (filterStock === 'HIGH') {
+        matchesStock = p.stock > (p.minStock * 3); // Example: High is > 3x min stock
+    } else if (filterStock === 'MEDIUM') {
+        matchesStock = p.stock > p.minStock && p.stock <= (p.minStock * 3);
+    }
+
+    return matchesSearch && matchesCategory && matchesSupplier && matchesStock;
+  });
 
   const lowStockProducts = products.filter(p => p.stock <= p.minStock);
 
+  // --- VIEW: AUDIT LOG (MANAGER ONLY) ---
+  if (showAuditLog && isManager) {
+    return (
+        <div className="p-6 max-w-7xl mx-auto space-y-6">
+            <div className="flex justify-between items-center">
+                <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Auditoría de Inventario</h2>
+                    <p className="text-slate-500 text-sm">Registro detallado de movimientos</p>
+                </div>
+                <button 
+                    onClick={() => setShowAuditLog(false)}
+                    className="bg-white border border-slate-300 text-slate-700 px-4 py-2 rounded-lg hover:bg-slate-50"
+                >
+                    Volver al Inventario
+                </button>
+            </div>
+
+            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <table className="w-full text-left text-sm">
+                    <thead className="bg-slate-50 text-slate-700 font-bold border-b border-slate-200">
+                        <tr>
+                            <th className="p-4">Fecha</th>
+                            <th className="p-4">Producto</th>
+                            <th className="p-4">Tipo Movimiento</th>
+                            <th className="p-4 text-right">Cantidad</th>
+                            <th className="p-4">Usuario Responsable</th>
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                        {inventoryLogs.length === 0 ? (
+                            <tr><td colSpan={5} className="p-8 text-center text-slate-400">Sin registros aún.</td></tr>
+                        ) : (
+                            [...inventoryLogs].reverse().map(log => (
+                                <tr key={log.id} className="hover:bg-slate-50">
+                                    <td className="p-4 text-slate-500">
+                                        {new Date(log.date).toLocaleString()}
+                                    </td>
+                                    <td className="p-4 font-medium text-slate-800">
+                                        {log.productName}
+                                    </td>
+                                    <td className="p-4">
+                                        <span className={`px-2 py-1 rounded text-xs font-bold
+                                            ${log.type === 'ENTRADA' ? 'bg-green-100 text-green-700' : 
+                                              log.type === 'VENTA' ? 'bg-blue-50 text-blue-600' :
+                                              log.type === 'ELIMINACION' ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}
+                                        `}>
+                                            {log.type}
+                                        </span>
+                                    </td>
+                                    <td className={`p-4 text-right font-mono font-bold ${log.quantity > 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                        {log.quantity > 0 ? '+' : ''}{log.quantity}
+                                    </td>
+                                    <td className="p-4 text-slate-600">
+                                        <div className="flex items-center gap-2">
+                                            <div className="w-6 h-6 rounded-full bg-slate-200 flex items-center justify-center text-xs font-bold">
+                                                {log.userName.charAt(0)}
+                                            </div>
+                                            {log.userName}
+                                        </div>
+                                    </td>
+                                </tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    );
+  }
+
+  // --- VIEW: MAIN INVENTORY ---
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -145,18 +341,30 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
           <p className="text-slate-500 text-sm">Gestiona tus productos, costos y catálogo</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto">
+            {isManager && (
+                <button 
+                    onClick={() => setShowAuditLog(true)}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg transition-colors border border-slate-200"
+                    title="Ver Auditoría"
+                >
+                    <ClipboardList size={18} />
+                </button>
+            )}
             <button 
             onClick={() => setShowOrderPreview(true)}
             className="flex-1 md:flex-none bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors border border-amber-200 text-sm font-medium"
             >
             <Archive size={18} /> OC
             </button>
-            <button 
-            onClick={() => openModal()}
-            className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm text-sm font-medium"
-            >
-            <Plus size={18} /> Nuevo
-            </button>
+            {/* Create Button only for Admin/Manager */}
+            {canEditProduct && (
+              <button 
+                onClick={() => openModal()}
+                className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm text-sm font-medium"
+              >
+                <Plus size={18} /> Nuevo
+              </button>
+            )}
         </div>
       </div>
 
@@ -198,17 +406,28 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+        {/* Main Toolbar */}
         <div className="p-4 border-b border-slate-200 flex flex-col sm:flex-row gap-4 justify-between items-center">
-          <div className="relative flex-1 w-full max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
-            <input 
-              type="text" 
-              placeholder="Buscar productos..." 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
-            />
+          <div className="flex gap-2 w-full max-w-2xl">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400" size={18} />
+                <input 
+                  type="text" 
+                  placeholder="Buscar productos..." 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-white border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+                />
+              </div>
+              <button 
+                onClick={() => setShowFilters(!showFilters)}
+                className={`p-2 rounded-lg border transition-colors flex items-center gap-2 text-sm font-medium ${showFilters ? 'bg-slate-100 border-slate-300 text-slate-800' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
+              >
+                <Filter size={18} />
+                <span className="hidden sm:inline">Filtros</span>
+              </button>
           </div>
+
           <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
              <button 
                 onClick={() => setViewMode('LIST')}
@@ -226,6 +445,55 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
              </button>
           </div>
         </div>
+
+        {/* Collapsible Filters Panel */}
+        {showFilters && (
+            <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 duration-200">
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Categoría</label>
+                    <select 
+                        value={filterCategory}
+                        onChange={(e) => setFilterCategory(e.target.value)}
+                        className="w-full text-sm border-slate-200 rounded-lg focus:ring-blue-500 bg-white"
+                    >
+                        <option value="">Todas</option>
+                        {uniqueCategories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Proveedor</label>
+                    <select 
+                        value={filterSupplier}
+                        onChange={(e) => setFilterSupplier(e.target.value)}
+                        className="w-full text-sm border-slate-200 rounded-lg focus:ring-blue-500 bg-white"
+                    >
+                        <option value="">Todos</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                    </select>
+                </div>
+                <div>
+                    <label className="block text-xs font-bold text-slate-500 mb-1">Nivel de Stock</label>
+                    <select 
+                        value={filterStock}
+                        onChange={(e) => setFilterStock(e.target.value as any)}
+                        className="w-full text-sm border-slate-200 rounded-lg focus:ring-blue-500 bg-white"
+                    >
+                        <option value="ALL">Todos los niveles</option>
+                        <option value="LOW">Bajo / Crítico (Reordenar)</option>
+                        <option value="MEDIUM">Medio / Saludable</option>
+                        <option value="HIGH">Alto / Excedente</option>
+                    </select>
+                </div>
+                <div className="flex items-end">
+                    <button 
+                        onClick={clearFilters}
+                        className="w-full py-2 bg-white border border-slate-200 text-slate-600 hover:text-red-500 hover:border-red-200 rounded-lg text-sm font-medium flex items-center justify-center gap-2"
+                    >
+                        <X size={16} /> Limpiar Filtros
+                    </button>
+                </div>
+            </div>
+        )}
 
         {viewMode === 'LIST' ? (
         <div className="overflow-x-auto">
@@ -287,19 +555,25 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                     <td className="px-6 py-4 text-slate-500">{supplier?.name || '-'}</td>
                     <td className="px-6 py-4 text-right">
                       <div className="flex justify-end gap-2">
-                        <button 
-                            onClick={() => openStockModal(product)} 
-                            className="p-1 hover:bg-green-100 rounded text-green-600"
-                            title="Recibir Stock (Entrada)"
-                        >
-                          <ArrowDownCircle size={16} />
-                        </button>
-                        <button onClick={() => openModal(product)} className="p-1 hover:bg-slate-200 rounded text-slate-600">
-                          <Edit size={16} />
-                        </button>
-                        <button onClick={() => handleDelete(product.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
-                          <Trash2 size={16} />
-                        </button>
+                        {canManageStock && (
+                            <button 
+                                onClick={() => openStockModal(product)} 
+                                className="p-1 hover:bg-green-100 rounded text-green-600"
+                                title="Gestionar Stock"
+                            >
+                                <RefreshCw size={16} />
+                            </button>
+                        )}
+                        {canEditProduct && (
+                          <>
+                            <button onClick={() => openModal(product)} className="p-1 hover:bg-slate-200 rounded text-slate-600">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDelete(product.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -308,7 +582,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
               {filteredProducts.length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                    No se encontraron productos.
+                    No se encontraron productos con los filtros actuales.
                   </td>
                 </tr>
               )}
@@ -365,25 +639,21 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                                 </div>
                             </div>
                             {/* Admin Quick Actions for Catalog */}
-                            <div className="bg-slate-50 p-2 border-t border-slate-100 flex justify-between text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span>Costo: ${product.cost.toFixed(2)}</span>
-                                <button onClick={() => openModal(product)} className="hover:text-blue-600 font-medium">Editar</button>
-                            </div>
+                            {canEditProduct && (
+                                <div className="bg-slate-50 p-2 border-t border-slate-100 flex justify-between text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <span>Costo: ${product.cost.toFixed(2)}</span>
+                                    <button onClick={() => openModal(product)} className="hover:text-blue-600 font-medium">Editar</button>
+                                </div>
+                            )}
                         </div>
                     ))}
                 </div>
-                {filteredProducts.length === 0 && (
-                     <div className="flex flex-col items-center justify-center py-12 text-slate-400">
-                        <Search size={48} className="mb-4 opacity-20" />
-                        <p>No hay productos para mostrar en el catálogo.</p>
-                     </div>
-                )}
             </div>
         )}
       </div>
 
       {/* MODAL: PRODUCT FORM */}
-      {isModalOpen && (
+      {isModalOpen && canEditProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSubmit} className="p-6">
@@ -584,19 +854,41 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
         </div>
       )}
 
-      {/* MODAL: STOCK ENTRY (REPLENISH) */}
-      {isStockModalOpen && stockProduct && (
+      {/* MODAL: STOCK ENTRY/EXIT (REPLENISH OR ADJUST) */}
+      {isStockModalOpen && stockProduct && canManageStock && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
-            <h3 className="text-xl font-bold mb-4 text-green-700 flex items-center gap-2">
-                <ArrowDownCircle size={24}/> Recibir Stock
+            <h3 className="text-xl font-bold mb-4 text-slate-800 flex items-center gap-2">
+                <RefreshCw size={24}/> Gestión de Stock
             </h3>
             <p className="text-sm text-slate-600 mb-4">
-                Agregando unidades a: <strong>{stockProduct.name}</strong>
+                Producto: <strong>{stockProduct.name}</strong><br/>
+                Stock Actual: {stockProduct.stock}
             </p>
-            <form onSubmit={handleAddStock} className="space-y-4">
+            <form onSubmit={handleStockUpdate} className="space-y-4">
+              
+              {/* Toggle for Entry/Exit */}
+              <div className="flex bg-slate-100 p-1 rounded-lg">
+                  <button 
+                    type="button"
+                    onClick={() => setStockType('ENTRY')}
+                    className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 ${stockType === 'ENTRY' ? 'bg-white text-green-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                      <ArrowDownCircle size={16} /> Entrada
+                  </button>
+                  <button 
+                    type="button"
+                    onClick={() => setStockType('EXIT')}
+                    className={`flex-1 py-1.5 rounded-md text-sm font-bold transition-all flex items-center justify-center gap-2 ${stockType === 'EXIT' ? 'bg-white text-red-700 shadow-sm' : 'text-slate-400 hover:text-slate-600'}`}
+                  >
+                      <ArrowUpCircle size={16} /> Salida
+                  </button>
+              </div>
+
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Cantidad a ingresar</label>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                    {stockType === 'ENTRY' ? 'Cantidad a ingresar' : 'Cantidad a retirar'}
+                </label>
                 <input 
                   autoFocus
                   required
@@ -605,7 +897,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                   step="0.01"
                   value={stockEntryValue}
                   onChange={e => setStockEntryValue(e.target.value)}
-                  className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 outline-none text-lg font-bold"
+                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 outline-none text-lg font-bold ${stockType === 'ENTRY' ? 'focus:ring-green-500 text-green-700' : 'focus:ring-red-500 text-red-700'}`}
                   placeholder="0"
                 />
               </div>
@@ -619,9 +911,9 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                 </button>
                 <button 
                     type="submit" 
-                    className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    className={`px-4 py-2 text-white rounded-lg transition-colors ${stockType === 'ENTRY' ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'}`}
                 >
-                    Confirmar Entrada
+                    Confirmar {stockType === 'ENTRY' ? 'Entrada' : 'Salida'}
                 </button>
               </div>
             </form>
