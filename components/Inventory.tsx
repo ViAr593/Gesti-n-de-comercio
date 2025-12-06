@@ -1,6 +1,3 @@
-
-
-
 import React, { useState } from 'react';
 import { Product, Supplier, InventoryLog, Employee } from '../types';
 import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon, Upload, X, Filter, RefreshCw, ClipboardList, ArrowUpCircle } from 'lucide-react';
@@ -352,9 +349,9 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
             )}
             <button 
             onClick={() => setShowOrderPreview(true)}
-            className="flex-1 md:flex-none bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors border border-amber-200 text-sm font-medium"
+            className="flex-1 md:flex-none bg-amber-100 hover:bg-amber-200 text-amber-800 px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors border border-amber-200 text-sm font-medium whitespace-nowrap"
             >
-            <Archive size={18} /> OC
+            <Archive size={18} /> Sugerencia de Compra (OC)
             </button>
             {/* Create Button only for Admin/Manager */}
             {canEditProduct && (
