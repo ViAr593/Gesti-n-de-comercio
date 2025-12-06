@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Calculator, Percent, CheckSquare, Banknote, Trash2, Plus, ArrowRight, MapPin, Database, Copy } from 'lucide-react';
+import { Calculator, Percent, CheckSquare, Banknote, Trash2, Plus, ArrowRight, MapPin, Database, Copy, Code, FileCode } from 'lucide-react';
 import { Product } from '../types';
 
 interface ToolsProps {
@@ -8,7 +8,8 @@ interface ToolsProps {
 }
 
 export const Tools: React.FC<ToolsProps> = ({ products = [] }) => {
-  const [activeTab, setActiveTab] = useState<'PRICE' | 'DISCOUNT' | 'TODO' | 'CHANGE' | 'MAP' | 'DB'>('PRICE');
+  const [activeTab, setActiveTab] = useState<'PRICE' | 'DISCOUNT' | 'TODO' | 'CHANGE' | 'MAP' | 'DB' | 'CODE'>('PRICE');
+  const [codeLanguage, setCodeLanguage] = useState<'PYTHON' | 'JAVA'>('PYTHON');
 
   // State for Price Calculator
   const [cost, setCost] = useState('');
@@ -114,15 +115,128 @@ CREATE TABLE products (
     return `-- MySQL Database Schema & Data Export\n${tableProducts}\n\n-- Current Data\n${insertProducts}`;
   };
 
+  // Generate Application Code (Python/Java)
+  const generateAppCode = () => {
+    if (codeLanguage === 'PYTHON') {
+        return `# Python Data Models for GestorPro
+from dataclasses import dataclass
+from typing import List, Optional
+import datetime
+
+@dataclass
+class Product:
+    id: str
+    name: str
+    description: str
+    price: float
+    cost: float
+    stock: int
+    min_stock: int
+    category: str
+    supplier_id: str
+    measurement_unit: str
+    measurement_value: float
+
+@dataclass
+class SaleItem:
+    product_id: str
+    quantity: float
+    discount: float
+    subtotal: float
+
+@dataclass
+class Sale:
+    id: str
+    date: datetime.datetime
+    total: float
+    items: List[SaleItem]
+    payment_method: str
+    customer_name: str
+
+# Example Service Logic
+class InventoryService:
+    def __init__(self):
+        self.products = []
+
+    def add_product(self, product: Product):
+        self.products.append(product)
+        print(f"Product {product.name} added.")
+
+    def check_stock(self):
+        low_stock = [p for p in self.products if p.stock <= p.min_stock]
+        return low_stock
+
+# Usage Example
+if __name__ == "__main__":
+    p1 = Product("1", "Laptop", "Gaming Laptop", 1200.0, 900.0, 5, 2, "Electronics", "s1", "UNIT", 1)
+    service = InventoryService()
+    service.add_product(p1)
+`;
+    } else {
+        return `// Java POJOs for GestorPro
+import java.util.List;
+import java.util.Date;
+import java.math.BigDecimal;
+
+public class Product {
+    private String id;
+    private String name;
+    private String description;
+    private BigDecimal price;
+    private BigDecimal cost;
+    private int stock;
+    private int minStock;
+    private String category;
+    
+    // Constructors, Getters and Setters
+    public Product(String id, String name, BigDecimal price) {
+        this.id = id;
+        this.name = name;
+        this.price = price;
+    }
+    
+    public BigDecimal calculateProfit() {
+        return this.price.subtract(this.cost);
+    }
+}
+
+public class Sale {
+    private String id;
+    private Date date;
+    private BigDecimal total;
+    private List<Product> items;
+    private String paymentMethod;
+    
+    public void processSale() {
+        // Logic to deduct stock and save transaction
+        System.out.println("Processing sale ID: " + this.id);
+    }
+}
+
+// Spring Boot Controller Example
+/*
+@RestController
+@RequestMapping("/api/products")
+public class ProductController {
+    @GetMapping
+    public List<Product> getAllProducts() {
+        return productService.findAll();
+    }
+}
+*/
+`;
+    }
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto min-h-screen">
        <div className="mb-8">
           <h2 className="text-2xl font-bold text-slate-800">Herramientas & Utilidades</h2>
-          <p className="text-slate-500 text-sm">Calculadoras y ayudas rápidas para tu negocio</p>
+          <p className="text-slate-500 text-sm">Calculadoras, ayudas y herramientas para desarrolladores</p>
        </div>
 
        {/* Tabs Navigation */}
-       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2 mb-8">
+       <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-8">
           <button 
             onClick={() => setActiveTab('PRICE')}
             className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all border ${activeTab === 'PRICE' ? 'bg-blue-600 text-white border-blue-600 shadow-lg shadow-blue-900/20' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
@@ -168,7 +282,15 @@ CREATE TABLE products (
             className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all border ${activeTab === 'DB' ? 'bg-slate-700 text-white border-slate-700 shadow-lg shadow-slate-900/20' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
           >
             <Database size={24} />
-            <span className="font-bold text-xs md:text-sm">Base de Datos</span>
+            <span className="font-bold text-xs md:text-sm">SQL Export</span>
+          </button>
+
+          <button 
+            onClick={() => setActiveTab('CODE')}
+            className={`p-4 rounded-xl flex flex-col items-center justify-center gap-2 transition-all border ${activeTab === 'CODE' ? 'bg-pink-600 text-white border-pink-600 shadow-lg shadow-pink-900/20' : 'bg-white text-slate-500 border-slate-200 hover:bg-slate-50'}`}
+          >
+            <Code size={24} />
+            <span className="font-bold text-xs md:text-sm">Generar App</span>
           </button>
        </div>
 
@@ -421,6 +543,52 @@ CREATE TABLE products (
                         onClick={() => {navigator.clipboard.writeText(generateSQL()); alert('SQL Copiado!')}}
                         className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-2 rounded transition-colors"
                         title="Copiar SQL"
+                    >
+                        <Copy size={20} />
+                    </button>
+                </div>
+            </div>
+          )}
+
+          {/* CODE GENERATOR */}
+          {activeTab === 'CODE' && (
+             <div className="max-w-4xl mx-auto">
+                <h3 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-2">
+                    <FileCode className="text-pink-600"/> Generador de Código Fuente
+                </h3>
+                
+                <div className="flex gap-4 mb-4">
+                    <button 
+                        onClick={() => setCodeLanguage('PYTHON')}
+                        className={`flex-1 py-3 rounded-lg font-bold transition-all ${codeLanguage === 'PYTHON' ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                        Python (Data Classes)
+                    </button>
+                    <button 
+                        onClick={() => setCodeLanguage('JAVA')}
+                        className={`flex-1 py-3 rounded-lg font-bold transition-all ${codeLanguage === 'JAVA' ? 'bg-orange-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
+                    >
+                        Java (POJOs / Spring)
+                    </button>
+                </div>
+
+                <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-600 mb-4">
+                    <p>
+                        Este código contiene las estructuras de datos base de tu aplicación. 
+                        Cópialo en tu proyecto de {codeLanguage === 'PYTHON' ? 'Python (main.py)' : 'Java (src/main/java/Models.java)'} para comenzar.
+                    </p>
+                </div>
+                
+                <div className="relative">
+                    <textarea 
+                        readOnly
+                        value={generateAppCode()}
+                        className="w-full h-96 font-mono text-xs bg-slate-900 text-blue-300 p-4 rounded-xl focus:outline-none"
+                    ></textarea>
+                    <button 
+                        onClick={() => {navigator.clipboard.writeText(generateAppCode()); alert('Código Copiado!')}}
+                        className="absolute top-4 right-4 bg-white/10 hover:bg-white/20 text-white p-2 rounded transition-colors"
+                        title="Copiar Código"
                     >
                         <Copy size={20} />
                     </button>
