@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product, Supplier } from '../types';
-import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon, Upload, X } from 'lucide-react';
 import { generateProductDescription } from '../services/gemini';
 
 interface InventoryProps {
@@ -33,7 +33,8 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
     category: '',
     supplierId: '',
     measurementUnit: 'UNIDAD',
-    measurementValue: 1
+    measurementValue: 1,
+    image: ''
   };
 
   const [formData, setFormData] = useState<Omit<Product, 'id'>>(initialFormState);
@@ -52,6 +53,17 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
     const desc = await generateProductDescription(formData.name, formData.category);
     setFormData(prev => ({ ...prev, description: desc }));
     setIsGenerating(false);
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData(prev => ({ ...prev, image: reader.result as string }));
+      };
+      reader.readAsDataURL(file);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -96,7 +108,8 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
         category: product.category,
         supplierId: product.supplierId,
         measurementUnit: product.measurementUnit || 'UNIDAD',
-        measurementValue: product.measurementValue || 1
+        measurementValue: product.measurementValue || 1,
+        image: product.image || ''
       });
     } else {
       setEditingProduct(null);
@@ -235,11 +248,22 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                 return (
                   <tr key={product.id} className="hover:bg-slate-50 transition-colors">
                     <td className="px-6 py-4">
-                      <div className="font-medium text-slate-900">{product.name}</div>
-                      <div className="text-xs text-slate-400 truncate max-w-[200px]">{product.description}</div>
-                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 mt-1">
-                        {product.category}
-                      </span>
+                      <div className="flex items-center gap-3">
+                         {product.image ? (
+                             <img src={product.image} alt={product.name} className="w-10 h-10 rounded-lg object-cover border border-slate-200" />
+                         ) : (
+                             <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-400 font-bold text-xs border border-slate-200">
+                                 {product.name.substring(0,2).toUpperCase()}
+                             </div>
+                         )}
+                         <div>
+                            <div className="font-medium text-slate-900">{product.name}</div>
+                            <div className="text-xs text-slate-400 truncate max-w-[200px]">{product.description}</div>
+                            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-slate-100 text-slate-500 mt-1">
+                                {product.category}
+                            </span>
+                         </div>
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-1.5 text-slate-700">
@@ -297,13 +321,19 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredProducts.map(product => (
                         <div key={product.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all group flex flex-col">
-                            {/* Fake Image Placeholder */}
-                            <div className="h-40 bg-slate-100 flex items-center justify-center relative">
-                                <div className="text-4xl font-bold text-slate-300 select-none">
-                                    {product.name.substring(0,2).toUpperCase()}
-                                </div>
-                                <ImageIcon className="absolute top-4 right-4 text-slate-300 opacity-50" size={20} />
-                                <div className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs font-bold text-slate-700 shadow-sm">
+                            {/* Product Image */}
+                            <div className="h-48 bg-slate-100 flex items-center justify-center relative overflow-hidden">
+                                {product.image ? (
+                                    <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+                                ) : (
+                                    <>
+                                        <div className="text-4xl font-bold text-slate-300 select-none">
+                                            {product.name.substring(0,2).toUpperCase()}
+                                        </div>
+                                        <ImageIcon className="absolute top-4 right-4 text-slate-300 opacity-50" size={20} />
+                                    </>
+                                )}
+                                <div className="absolute bottom-2 left-2 bg-white/90 px-2 py-1 rounded text-xs font-bold text-slate-700 shadow-sm backdrop-blur-sm">
                                     {product.category}
                                 </div>
                             </div>
@@ -355,14 +385,76 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
       {/* MODAL: PRODUCT FORM */}
       {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+          <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSubmit} className="p-6">
               <h3 className="text-xl font-bold mb-6 text-slate-800">
                 {editingProduct ? 'Editar Producto' : 'Nuevo Producto'}
               </h3>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-12 gap-6 mb-6">
+                
+                {/* Left Column: Image Upload */}
+                <div className="md:col-span-4 space-y-4">
+                    <label className="block text-sm font-medium text-slate-700">Imagen del Producto</label>
+                    <div className="relative w-full aspect-square bg-slate-50 border-2 border-dashed border-slate-300 rounded-xl overflow-hidden hover:border-blue-400 transition-colors group">
+                        {formData.image ? (
+                            <>
+                                <img src={formData.image} alt="Preview" className="w-full h-full object-cover" />
+                                <button 
+                                    type="button"
+                                    onClick={() => setFormData({...formData, image: ''})}
+                                    className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full shadow-sm hover:bg-red-600 transition-colors"
+                                >
+                                    <X size={14}/>
+                                </button>
+                            </>
+                        ) : (
+                            <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
+                                <Upload size={32} className="mb-2"/>
+                                <span className="text-xs text-center px-4">Click para subir imagen</span>
+                            </div>
+                        )}
+                        <input 
+                            type="file" 
+                            accept="image/*"
+                            onChange={handleImageUpload}
+                            className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                        />
+                    </div>
+                    <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
+                        <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Medidas</label>
+                        <div className="grid grid-cols-2 gap-2">
+                            <div>
+                                <select
+                                value={formData.measurementUnit}
+                                onChange={e => setFormData({...formData, measurementUnit: e.target.value as any})}
+                                className="w-full px-2 py-2 border rounded-lg text-xs bg-white"
+                                >
+                                <option value="UNIDAD">Unidad</option>
+                                <option value="KG">Kg</option>
+                                <option value="G">g</option>
+                                <option value="L">Litros</option>
+                                <option value="ML">ml</option>
+                                <option value="M">Metros</option>
+                                </select>
+                            </div>
+                            <div>
+                                <input 
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                value={formData.measurementValue}
+                                onChange={e => setFormData({...formData, measurementValue: Number(e.target.value)})}
+                                className="w-full px-2 py-2 border rounded-lg text-xs"
+                                placeholder="Cant."
+                                />
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Right Column: Details */}
+                <div className="md:col-span-8 space-y-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">Nombre del Producto</label>
                     <input 
@@ -373,64 +465,31 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                       className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                     />
                   </div>
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
-                    <input 
-                      required
-                      type="text" 
-                      value={formData.category}
-                      onChange={e => setFormData({...formData, category: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                    />
-                  </div>
                   
-                  {/* Weight and Volume Section */}
-                  <div className="bg-slate-50 p-3 rounded-lg border border-slate-100">
-                    <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Medidas y Peso</label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Unidad</label>
-                        <select
-                          value={formData.measurementUnit}
-                          onChange={e => setFormData({...formData, measurementUnit: e.target.value as any})}
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white text-sm"
-                        >
-                          <option value="UNIDAD">Unidad (pza)</option>
-                          <option value="KG">Kilogramos (kg)</option>
-                          <option value="G">Gramos (g)</option>
-                          <option value="L">Litros (L)</option>
-                          <option value="ML">Mililitros (ml)</option>
-                          <option value="M">Metros (m)</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Valor</label>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
                         <input 
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={formData.measurementValue}
-                          onChange={e => setFormData({...formData, measurementValue: Number(e.target.value)})}
-                          className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm"
+                        required
+                        type="text" 
+                        value={formData.category}
+                        onChange={e => setFormData({...formData, category: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
                         />
-                      </div>
+                    </div>
+                     <div>
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
+                        <select 
+                        value={formData.supplierId}
+                        onChange={e => setFormData({...formData, supplierId: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                        >
+                        <option value="">Seleccionar...</option>
+                        {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
                     </div>
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
-                    <select 
-                      value={formData.supplierId}
-                      onChange={e => setFormData({...formData, supplierId: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
-                    >
-                      <option value="">Seleccionar...</option>
-                      {suppliers.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <label className="block text-sm font-medium text-slate-700 mb-1">Costo</label>

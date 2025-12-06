@@ -1,14 +1,15 @@
 
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, Users, History, Store, Wallet, UserCircle, Briefcase, Wrench } from 'lucide-react';
-import { ViewState } from '../types';
+import { LayoutDashboard, Package, ShoppingCart, Users, History, Store, Wallet, UserCircle, Briefcase, Wrench, Settings } from 'lucide-react';
+import { ViewState, BusinessConfig } from '../types';
 
 interface SidebarProps {
   currentView: ViewState;
   setView: (view: ViewState) => void;
+  businessConfig?: BusinessConfig;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, businessConfig }) => {
   const menuItems = [
     { id: 'DASHBOARD', label: 'Balance', icon: LayoutDashboard },
     { id: 'POS', label: 'Vender (POS)', icon: ShoppingCart },
@@ -19,6 +20,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
     { id: 'EMPLOYEES', label: 'Empleados', icon: Briefcase },
     { id: 'TOOLS', label: 'Herramientas', icon: Wrench },
     { id: 'SALES_HISTORY', label: 'Movimientos', icon: History },
+    { id: 'SETTINGS', label: 'Configuración', icon: Settings },
   ];
 
   return (
@@ -56,11 +58,15 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
 
       <div className="p-4 border-t border-slate-100 bg-slate-50">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
-            GP
+          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden">
+            {businessConfig?.logo ? (
+                <img src={businessConfig.logo} alt="Logo" className="w-full h-full object-cover"/>
+            ) : (
+                "GP"
+            )}
           </div>
-          <div className="overflow-hidden">
-            <p className="text-sm font-semibold text-slate-700 truncate">Mi Negocio</p>
+          <div className="overflow-hidden flex-1">
+            <p className="text-sm font-semibold text-slate-700 truncate">{businessConfig?.name || 'Mi Negocio'}</p>
             <p className="text-xs text-slate-500 truncate">Plan Gratuito</p>
           </div>
         </div>

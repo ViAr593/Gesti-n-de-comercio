@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Product, CartItem, Sale, Customer, Expense, Quotation } from '../types';
+import { Product, CartItem, Sale, Customer, Expense, Quotation, BusinessConfig } from '../types';
 import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown, FileText, Download } from 'lucide-react';
 
 interface POSProps {
@@ -10,9 +10,10 @@ interface POSProps {
   setExpenses?: React.Dispatch<React.SetStateAction<Expense[]>>;
   quotations?: Quotation[];
   setQuotations?: React.Dispatch<React.SetStateAction<Quotation[]>>;
+  businessConfig?: BusinessConfig;
 }
 
-export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSale, setExpenses, quotations, setQuotations }) => {
+export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSale, setExpenses, quotations, setQuotations, businessConfig }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -230,9 +231,13 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
           
           <div className="p-6 overflow-y-auto font-mono text-sm bg-white">
             <div className="text-center mb-6 pb-4 border-b border-dashed border-slate-300">
-              <p className="font-bold text-lg">Mi Negocio Local</p>
-              <p className="text-slate-500">RUC: 123456789001</p>
-              <p className="text-slate-500">Dirección Principal #123</p>
+              {businessConfig?.logo && (
+                  <img src={businessConfig.logo} alt="Logo" className="h-12 mx-auto mb-2 opacity-80 grayscale" />
+              )}
+              <p className="font-bold text-lg">{businessConfig?.name || 'Mi Negocio Local'}</p>
+              <p className="text-slate-500">ID: {businessConfig?.taxId || '999999999'}</p>
+              <p className="text-slate-500">{businessConfig?.address || 'Dirección General'}</p>
+              <p className="text-slate-500">{businessConfig?.phone}</p>
             </div>
 
             <div className="mb-4 space-y-1">
@@ -285,6 +290,12 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
                 <span>${showReceipt.total.toFixed(2)}</span>
               </div>
             </div>
+            
+            {businessConfig?.receiptMessage && (
+                <div className="mt-8 text-center text-xs text-slate-500 italic">
+                    {businessConfig.receiptMessage}
+                </div>
+            )}
           </div>
 
           <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3 print:hidden">
@@ -309,7 +320,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
           <div className="flex gap-2 justify-between md:justify-start">
              <button 
               onClick={resetSale}
-              className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap border border-slate-300 transition-colors text-sm md:text-base"
+              className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap border border-slate-300 transition-colors text-sm md:text-base bg-white"
             >
               <RefreshCw size={16} /> <span className="hidden sm:inline">Nueva Venta</span>
             </button>
@@ -327,7 +338,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             </button>
             <button 
                 onClick={() => setShowManualItemModal(true)}
-                className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap md:hidden text-sm md:text-base"
+                className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap md:hidden text-sm md:text-base bg-white"
             >
                 <Tag size={16} /> Manual
             </button>
@@ -344,7 +355,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
           </div>
           <button 
             onClick={() => setShowManualItemModal(true)}
-            className="hidden md:flex px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 items-center gap-2 whitespace-nowrap"
+            className="hidden md:flex px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 items-center gap-2 whitespace-nowrap bg-white"
           >
             <Tag size={18} /> Item Manual
           </button>

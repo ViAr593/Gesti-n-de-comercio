@@ -1,5 +1,5 @@
 
-import { Product, Supplier, Customer, Employee, Sale, Expense, Quotation } from '../types';
+import { Product, Supplier, Customer, Employee, Sale, Expense, Quotation, BusinessConfig } from '../types';
 
 // Claves de almacenamiento (Storage Keys)
 const KEYS = {
@@ -10,6 +10,7 @@ const KEYS = {
   SALES: 'gp_db_sales',
   EXPENSES: 'gp_db_expenses',
   QUOTATIONS: 'gp_db_quotations',
+  CONFIG: 'gp_db_config',
 };
 
 // Datos Semilla (Initial/Seed Data) para cuando la app inicia por primera vez
@@ -75,7 +76,17 @@ const SEED_DATA = {
   
   expenses: [] as Expense[],
   
-  quotations: [] as Quotation[]
+  quotations: [] as Quotation[],
+
+  config: {
+    name: 'Mi Negocio Local',
+    taxId: '123456789001',
+    address: 'Dirección Principal #123',
+    phone: '555-0000',
+    email: 'contacto@negocio.com',
+    receiptMessage: '¡Gracias por su compra!',
+    currencySymbol: '$'
+  } as BusinessConfig
 };
 
 // Funciones Helper Genéricas
@@ -126,6 +137,10 @@ export const db = {
   quotations: {
     getAll: () => load<Quotation[]>(KEYS.QUOTATIONS, SEED_DATA.quotations),
     set: (data: Quotation[]) => save(KEYS.QUOTATIONS, data),
+  },
+  config: {
+    get: () => load<BusinessConfig>(KEYS.CONFIG, SEED_DATA.config),
+    set: (data: BusinessConfig) => save(KEYS.CONFIG, data),
   },
   auth: {
     // Validate credentials against the database

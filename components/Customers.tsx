@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Customer } from '../types';
-import { Plus, Edit, Trash2, User, Phone, Mail, MapPin, FileText, Smartphone } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Phone, Mail, MapPin, FileText, Smartphone, Contact } from 'lucide-react';
 
 interface CustomersProps {
   customers: Customer[];
@@ -70,18 +70,19 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
         
         if (contacts && contacts.length > 0) {
           const contact = contacts[0];
-          setFormData({
-            ...formData,
-            name: contact.name ? contact.name[0] : '',
-            phone: contact.tel ? contact.tel[0] : '',
-            email: contact.email ? contact.email[0] : ''
-          });
+          setFormData(prev => ({
+            ...prev,
+            name: contact.name ? contact.name[0] : prev.name,
+            phone: contact.tel ? contact.tel[0] : prev.phone,
+            email: contact.email ? contact.email[0] : prev.email
+          }));
         }
       } catch (ex) {
-        alert("No se pudo acceder a los contactos o se canceló la operación.");
+        // User cancelled or error
+        console.log(ex);
       }
     } else {
-      alert("Esta función solo está disponible en dispositivos móviles compatibles.");
+      alert("Esta función requiere un dispositivo móvil compatible (Android/iOS) y conexión segura (HTTPS).");
     }
   };
 
@@ -179,25 +180,28 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
               </h3>
               
               <div className="space-y-4">
-                <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                        <label className="block text-sm font-medium text-slate-700 mb-1">Nombre Completo / Razón Social</label>
-                        <input 
-                            required
-                            type="text" 
-                            value={formData.name}
-                            onChange={e => setFormData({...formData, name: e.target.value})}
-                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
-                    </div>
-                    <button 
-                        type="button" 
-                        onClick={handleImportContact}
-                        className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-200 mb-0.5"
-                        title="Importar desde Contactos (Móvil)"
-                    >
-                        <Smartphone size={20} />
-                    </button>
+                {/* Mobile Import Button */}
+                {!editingId && (
+                  <button 
+                    type="button" 
+                    onClick={handleImportContact}
+                    className="w-full bg-indigo-50 text-indigo-700 py-3 rounded-xl border border-indigo-100 flex items-center justify-center gap-2 hover:bg-indigo-100 transition-colors mb-2 font-medium"
+                    title="Importar desde la agenda de tu teléfono"
+                  >
+                      <Smartphone size={20} />
+                      Importar desde Agenda Móvil
+                  </button>
+                )}
+
+                <div>
+                    <label className="block text-sm font-medium text-slate-700 mb-1">Nombre Completo / Razón Social</label>
+                    <input 
+                        required
+                        type="text" 
+                        value={formData.name}
+                        onChange={e => setFormData({...formData, name: e.target.value})}
+                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                    />
                 </div>
 
                 <div>

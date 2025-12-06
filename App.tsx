@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation } from './types';
+import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation, BusinessConfig } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { Inventory } from './components/Inventory';
@@ -11,7 +11,8 @@ import { Expenses } from './components/Expenses';
 import { Customers } from './components/Customers';
 import { Employees } from './components/Employees';
 import { Tools } from './components/Tools';
-import { Login } from './components/Login'; // Import Login
+import { Settings } from './components/Settings'; // New Import
+import { Login } from './components/Login';
 import { Menu } from 'lucide-react';
 import { db } from './services/db'; 
 
@@ -28,6 +29,7 @@ const App: React.FC = () => {
   const [sales, setSales] = useState<Sale[]>(() => db.sales.getAll());
   const [expenses, setExpenses] = useState<Expense[]>(() => db.expenses.getAll());
   const [quotations, setQuotations] = useState<Quotation[]>(() => db.quotations.getAll());
+  const [businessConfig, setBusinessConfig] = useState<BusinessConfig>(() => db.config.get());
 
   // -- PERSIST CHANGES TO DB SERVICE --
   useEffect(() => { db.products.set(products); }, [products]);
@@ -37,6 +39,7 @@ const App: React.FC = () => {
   useEffect(() => { db.customers.set(customers); }, [customers]);
   useEffect(() => { db.employees.set(employees); }, [employees]);
   useEffect(() => { db.quotations.set(quotations); }, [quotations]);
+  useEffect(() => { db.config.set(businessConfig); }, [businessConfig]);
 
   // -- BUSINESS LOGIC --
   const handleCompleteSale = (newSale: Sale) => {
@@ -71,6 +74,7 @@ const App: React.FC = () => {
           setExpenses={setExpenses}
           quotations={quotations}
           setQuotations={setQuotations}
+          businessConfig={businessConfig}
         />;
       case 'EXPENSES':
         return <Expenses expenses={expenses} setExpenses={setExpenses} />;
@@ -84,6 +88,8 @@ const App: React.FC = () => {
         return <Employees employees={employees} setEmployees={setEmployees} />;
       case 'TOOLS':
         return <Tools products={products} />;
+      case 'SETTINGS':
+        return <Settings config={businessConfig} setConfig={setBusinessConfig} />;
       default:
         return <Dashboard sales={sales} expenses={expenses} products={products} />;
     }
@@ -98,8 +104,10 @@ const App: React.FC = () => {
       {/* Mobile Header */}
       <div className="md:hidden fixed w-full top-0 z-30 bg-white text-slate-800 p-4 flex justify-between items-center shadow-sm border-b border-slate-200 h-16">
         <span className="font-bold text-lg flex items-center gap-2">
-            <div className="w-6 h-6 bg-amber-400 rounded-md flex items-center justify-center text-xs">GP</div>
-            GestorPro
+            <div className="w-6 h-6 bg-amber-400 rounded-md flex items-center justify-center text-xs overflow-hidden">
+                 {businessConfig.logo ? <img src={businessConfig.logo} alt="Logo" className="w-full h-full object-cover" /> : "GP"}
+            </div>
+            {businessConfig.name}
         </span>
         <button onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
           <Menu size={24} />
@@ -111,7 +119,11 @@ const App: React.FC = () => {
         fixed inset-y-0 left-0 z-40 transform transition-transform duration-300 ease-in-out md:translate-x-0 md:static md:inset-auto
         ${mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <Sidebar currentView={currentView} setView={(v) => { setCurrentView(v); setMobileMenuOpen(false); }} />
+        <Sidebar 
+            currentView={currentView} 
+            setView={(v) => { setCurrentView(v); setMobileMenuOpen(false); }} 
+            businessConfig={businessConfig}
+        />
       </div>
 
       {/* Main Content Area */}

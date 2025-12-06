@@ -11,6 +11,7 @@ export interface Product {
   supplierId: string;
   measurementUnit: 'UNIDAD' | 'KG' | 'G' | 'L' | 'ML' | 'M';
   measurementValue: number;
+  image?: string; // Base64 string for product image
 }
 
 export interface Supplier {
@@ -72,4 +73,15 @@ export interface Expense {
   date: string; // ISO String
 }
 
-export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES' | 'TOOLS';
+export interface BusinessConfig {
+  name: string;
+  taxId: string;
+  phone: string;
+  email: string;
+  address: string;
+  receiptMessage: string;
+  currencySymbol: string;
+  logo?: string; // Base64 string
+}
+
+export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES' | 'TOOLS' | 'SETTINGS';
