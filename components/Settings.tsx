@@ -1,8 +1,8 @@
 
-
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { BusinessConfig } from '../types';
-import { Save, Building2, Receipt, Image as ImageIcon, Check, Moon, Sun } from 'lucide-react';
+import { Save, Building2, Receipt, Image as ImageIcon, Check, Moon, Sun, Database, Download, Upload, AlertTriangle } from 'lucide-react';
+import { db } from '../services/db';
 
 interface SettingsProps {
   config: BusinessConfig;
@@ -12,6 +12,7 @@ interface SettingsProps {
 export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
   const [formData, setFormData] = useState<BusinessConfig>(config);
   const [saved, setSaved] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -43,8 +44,80 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
     setTimeout(() => setSaved(false), 3000);
   };
 
+  const handleExportData = () => {
+    const fullData = {
+      config: formData, // Use current form data or db.config.get()
+      products: db.products.getAll(),
+      suppliers: db.suppliers.getAll(),
+      customers: db.customers.getAll(),
+      employees: db.employees.getAll(),
+      sales: db.sales.getAll(),
+      expenses: db.expenses.getAll(),
+      quotations: db.quotations.getAll(),
+      logs: db.logs.getAll(),
+      timestamp: new Date().toISOString(),
+      version: '1.0'
+    };
+
+    const dataStr = JSON.stringify(fullData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `backup_gestorpro_${new Date().toISOString().slice(0,10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImportData = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!confirm("ADVERTENCIA: Al importar un respaldo se SOBREESCRIBIRÁN todos los datos actuales (Ventas, Inventario, etc). ¿Desea continuar?")) {
+        if (fileInputRef.current) fileInputRef.current.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        
+        // Basic validation
+        if (!json.version || !json.config) {
+            throw new Error("Formato de archivo inválido.");
+        }
+
+        // Restore Data
+        if (json.products) db.products.set(json.products);
+        if (json.suppliers) db.suppliers.set(json.suppliers);
+        if (json.customers) db.customers.set(json.customers);
+        if (json.employees) db.employees.set(json.employees);
+        if (json.sales) db.sales.set(json.sales);
+        if (json.expenses) db.expenses.set(json.expenses);
+        if (json.quotations) db.quotations.set(json.quotations);
+        if (json.logs) db.logs.set(json.logs);
+        if (json.config) {
+            db.config.set(json.config);
+            setConfig(json.config); // Update local state immediately
+        }
+
+        alert("Base de datos restaurada correctamente. La página se recargará.");
+        window.location.reload();
+
+      } catch (error) {
+        console.error(error);
+        alert("Error al importar el archivo. Asegúrese de que sea un respaldo válido de GestorPro.");
+      }
+    };
+    reader.readAsText(file);
+  };
+
   return (
-    <div className="p-6 max-w-4xl mx-auto pb-20">
+    <div className="p-6 max-w-4xl mx-auto pb-24">
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-slate-800 dark:text-white">Configuración del Negocio</h2>
         <p className="text-slate-500 text-sm dark:text-slate-400">Personaliza la información que aparece en tus recibos y en la aplicación.</p>
@@ -202,6 +275,44 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
                         placeholder="$"
                     />
                  </div>
+            </div>
+        </div>
+
+        {/* CARD 3: Backup / Data Management */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
+                <Database className="text-slate-500" size={20} />
+                <h3 className="font-bold text-slate-700 dark:text-slate-200">Gestión de Datos (Backup)</h3>
+            </div>
+            <div className="p-6">
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-6">
+                    Guarda una copia de seguridad de todo tu negocio (ventas, inventario, clientes) o restaura una copia anterior.
+                    <br/><span className="text-amber-500 flex items-center gap-1 mt-1"><AlertTriangle size={14}/> Nota: Restaurar sobreescribirá los datos actuales.</span>
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4">
+                    <button
+                        type="button"
+                        onClick={handleExportData}
+                        className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    >
+                        <Download size={18}/> Exportar Copia de Seguridad
+                    </button>
+                    
+                    <button
+                        type="button"
+                        onClick={() => fileInputRef.current?.click()}
+                        className="flex-1 bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 px-4 py-3 rounded-lg font-medium flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-600 transition-colors"
+                    >
+                        <Upload size={18}/> Importar Copia de Seguridad
+                    </button>
+                    <input 
+                        type="file" 
+                        ref={fileInputRef} 
+                        className="hidden" 
+                        accept=".json"
+                        onChange={handleImportData}
+                    />
+                </div>
             </div>
         </div>
 
