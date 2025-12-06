@@ -1,7 +1,8 @@
 
+
 import React, { useState, useRef } from 'react';
-import { BusinessConfig } from '../types';
-import { Save, Building2, Receipt, Image as ImageIcon, Check, Moon, Sun, Database, Download, Upload, AlertTriangle } from 'lucide-react';
+import { BusinessConfig, OpeningHours, DaySchedule } from '../types';
+import { Save, Building2, Receipt, Image as ImageIcon, Check, Moon, Sun, Database, Download, Upload, AlertTriangle, Clock } from 'lucide-react';
 import { db } from '../services/db';
 
 interface SettingsProps {
@@ -36,6 +37,22 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
     const updatedConfig = { ...formData, theme };
     setFormData(updatedConfig);
     setConfig(updatedConfig); // Apply theme immediately
+    setSaved(false);
+  };
+
+  const handleScheduleChange = (day: keyof OpeningHours, field: keyof DaySchedule, value: any) => {
+    if (!formData.openingHours) return;
+
+    setFormData(prev => ({
+        ...prev,
+        openingHours: {
+            ...prev.openingHours!,
+            [day]: {
+                ...prev.openingHours![day],
+                [field]: value
+            }
+        }
+    }));
     setSaved(false);
   };
 
@@ -117,6 +134,16 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
     };
     reader.readAsText(file);
   };
+
+  const daysOfWeek: { key: keyof OpeningHours, label: string }[] = [
+    { key: 'monday', label: 'Lunes' },
+    { key: 'tuesday', label: 'Martes' },
+    { key: 'wednesday', label: 'Miércoles' },
+    { key: 'thursday', label: 'Jueves' },
+    { key: 'friday', label: 'Viernes' },
+    { key: 'saturday', label: 'Sábado' },
+    { key: 'sunday', label: 'Domingo' },
+  ];
 
   return (
     <div className="p-6 max-w-4xl mx-auto pb-24">
@@ -247,6 +274,58 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
             </div>
           </div>
         </div>
+
+        {/* CARD: Opening Hours */}
+        {formData.openingHours && (
+            <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                        <Clock className="text-slate-500" size={20} />
+                        <h3 className="font-bold text-slate-700 dark:text-slate-200">Horarios de Atención</h3>
+                    </div>
+                </div>
+                <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {daysOfWeek.map((day) => {
+                            const schedule = formData.openingHours![day.key];
+                            return (
+                                <div key={day.key} className={`border rounded-lg p-3 flex flex-col gap-3 transition-colors ${schedule.isOpen ? 'border-green-500 bg-green-50/20 dark:border-green-700 dark:bg-green-900/10' : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900'}`}>
+                                    <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <input 
+                                                type="checkbox"
+                                                checked={schedule.isOpen}
+                                                onChange={(e) => handleScheduleChange(day.key, 'isOpen', e.target.checked)}
+                                                className="w-4 h-4 text-green-600 rounded border-slate-300 focus:ring-green-500"
+                                            />
+                                            <span className={`font-medium ${schedule.isOpen ? 'text-slate-800 dark:text-white' : 'text-slate-400 dark:text-slate-500'}`}>{day.label}</span>
+                                        </div>
+                                        {!schedule.isOpen && <span className="text-xs text-slate-400 uppercase font-bold">Cerrado</span>}
+                                    </div>
+                                    
+                                    <div className="flex gap-2">
+                                        <input 
+                                            type="time" 
+                                            value={schedule.open}
+                                            disabled={!schedule.isOpen}
+                                            onChange={(e) => handleScheduleChange(day.key, 'open', e.target.value)}
+                                            className="flex-1 px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800 dark:border-slate-600 dark:text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:dark:bg-slate-900 disabled:dark:text-slate-600"
+                                        />
+                                        <input 
+                                            type="time" 
+                                            value={schedule.close}
+                                            disabled={!schedule.isOpen}
+                                            onChange={(e) => handleScheduleChange(day.key, 'close', e.target.value)}
+                                            className="flex-1 px-2 py-1 border rounded text-sm bg-white dark:bg-slate-800 dark:border-slate-600 dark:text-white disabled:bg-slate-100 disabled:text-slate-400 disabled:dark:bg-slate-900 disabled:dark:text-slate-600"
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            </div>
+        )}
 
         {/* CARD 2: Receipt Customization */}
         <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">

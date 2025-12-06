@@ -86,7 +86,16 @@ const SEED_DATA = {
     email: 'contacto@negocio.com',
     receiptMessage: '¡Gracias por su compra!',
     currencySymbol: '$',
-    theme: 'light'
+    theme: 'light',
+    openingHours: {
+        monday: { isOpen: true, open: '09:00', close: '18:00' },
+        tuesday: { isOpen: true, open: '09:00', close: '18:00' },
+        wednesday: { isOpen: true, open: '09:00', close: '18:00' },
+        thursday: { isOpen: true, open: '09:00', close: '18:00' },
+        friday: { isOpen: true, open: '09:00', close: '18:00' },
+        saturday: { isOpen: true, open: '09:00', close: '13:00' },
+        sunday: { isOpen: false, open: '09:00', close: '13:00' }
+    }
   } as BusinessConfig
 };
 
@@ -140,7 +149,14 @@ export const db = {
     set: (data: Quotation[]) => save(KEYS.QUOTATIONS, data),
   },
   config: {
-    get: () => load<BusinessConfig>(KEYS.CONFIG, SEED_DATA.config),
+    get: () => {
+        const config = load<BusinessConfig>(KEYS.CONFIG, SEED_DATA.config);
+        // Ensure structure for existing users without openingHours
+        if (!config.openingHours) {
+            config.openingHours = SEED_DATA.config.openingHours;
+        }
+        return config;
+    },
     set: (data: BusinessConfig) => save(KEYS.CONFIG, data),
   },
   logs: {

@@ -74,6 +74,22 @@ export interface Expense {
   date: string; // ISO String
 }
 
+export interface DaySchedule {
+  isOpen: boolean;
+  open: string;
+  close: string;
+}
+
+export interface OpeningHours {
+  monday: DaySchedule;
+  tuesday: DaySchedule;
+  wednesday: DaySchedule;
+  thursday: DaySchedule;
+  friday: DaySchedule;
+  saturday: DaySchedule;
+  sunday: DaySchedule;
+}
+
 export interface BusinessConfig {
   name: string;
   taxId: string;
@@ -84,6 +100,7 @@ export interface BusinessConfig {
   currencySymbol: string;
   logo?: string; // Base64 string
   theme?: 'light' | 'dark';
+  openingHours?: OpeningHours;
 }
 
 export interface InventoryLog {
