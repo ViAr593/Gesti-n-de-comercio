@@ -33,7 +33,9 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
   };
 
   const handleThemeChange = (theme: 'light' | 'dark') => {
-    setFormData(prev => ({ ...prev, theme }));
+    const updatedConfig = { ...formData, theme };
+    setFormData(updatedConfig);
+    setConfig(updatedConfig); // Apply theme immediately
     setSaved(false);
   };
 
@@ -137,7 +139,7 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
                     <button
                         type="button"
                         onClick={() => handleThemeChange('light')}
-                        className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${formData.theme !== 'dark' ? 'border-amber-500 bg-amber-50 dark:bg-slate-700 text-slate-900 dark:text-white' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300'}`}
+                        className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${formData.theme !== 'dark' ? 'border-amber-500 bg-amber-50 dark:bg-slate-700 text-slate-900 dark:text-white' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 text-slate-500'}`}
                     >
                         <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-amber-500">
                             <Sun size={16} />
