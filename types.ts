@@ -36,6 +36,7 @@ export interface Employee {
   role: 'VENDEDOR' | 'ADMINISTRADOR' | 'GERENTE_GENERAL';
   phone: string;
   email: string;
+  password?: string; // Optional for legacy data, required for new
 }
 
 export interface CartItem extends Product {
@@ -53,6 +54,16 @@ export interface Sale {
   customerId?: string;
 }
 
+// Quotation is similar to Sale but doesn't affect stock immediately
+export interface Quotation {
+  id: string;
+  date: string;
+  total: number;
+  items: CartItem[];
+  customerName?: string;
+  expirationDate: string;
+}
+
 export interface Expense {
   id: string;
   description: string;
@@ -61,4 +72,4 @@ export interface Expense {
   date: string; // ISO String
 }
 
-export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES';
+export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES' | 'TOOLS';

@@ -1,16 +1,18 @@
 
 import React, { useState } from 'react';
-import { Product, CartItem, Sale, Customer, Expense } from '../types';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown } from 'lucide-react';
+import { Product, CartItem, Sale, Customer, Expense, Quotation } from '../types';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown, FileText, Download } from 'lucide-react';
 
 interface POSProps {
   products: Product[];
   customers?: Customer[];
   onCompleteSale: (sale: Sale) => void;
   setExpenses?: React.Dispatch<React.SetStateAction<Expense[]>>;
+  quotations?: Quotation[];
+  setQuotations?: React.Dispatch<React.SetStateAction<Quotation[]>>;
 }
 
-export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSale, setExpenses }) => {
+export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSale, setExpenses, quotations, setQuotations }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -35,6 +37,9 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
   // Quick Expense State
   const [showExpenseModal, setShowExpenseModal] = useState(false);
   const [expenseData, setExpenseData] = useState({ description: '', amount: '', category: 'Operativo' });
+
+  // Quotation State
+  const [showQuotationsModal, setShowQuotationsModal] = useState(false);
 
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return;
@@ -117,6 +122,34 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
     setShowReceipt(sale);
     clearCart();
     setIsMobileCartOpen(false);
+  };
+
+  const handleCreateQuotation = () => {
+    if (cart.length === 0 || !setQuotations) return;
+    const customerName = selectedCustomer ? selectedCustomer.name : (customerSearch.trim() || 'Cliente General');
+    
+    const quotation: Quotation = {
+        id: crypto.randomUUID(),
+        date: new Date().toISOString(),
+        total: calculateTotal(),
+        items: [...cart],
+        customerName: customerName,
+        expirationDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
+    };
+    
+    setQuotations(prev => [quotation, ...prev]);
+    alert('Cotización guardada exitosamente.');
+    clearCart();
+  };
+
+  const loadQuotation = (q: Quotation) => {
+    if (cart.length > 0) {
+        if (!confirm('¿Cargar cotización? Esto reemplazará el carrito actual.')) return;
+    }
+    setCart(q.items);
+    setCustomerSearch(q.customerName || '');
+    setShowQuotationsModal(false);
+    setIsMobileCartOpen(true);
   };
 
   const handleCreateExpense = () => {
@@ -279,6 +312,12 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
               className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-bold rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap border border-slate-300 transition-colors text-sm md:text-base"
             >
               <RefreshCw size={16} /> <span className="hidden sm:inline">Nueva Venta</span>
+            </button>
+            <button 
+              onClick={() => setShowQuotationsModal(true)}
+              className="flex-1 md:flex-none px-3 py-2 bg-blue-50 text-blue-600 font-bold rounded-lg hover:bg-blue-100 flex items-center justify-center gap-2 whitespace-nowrap border border-blue-200 transition-colors text-sm md:text-base"
+            >
+              <FileText size={16} /> <span className="hidden sm:inline">Ver Cotizaciones</span>
             </button>
              <button 
               onClick={() => setShowExpenseModal(true)}
@@ -470,13 +509,23 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             <span className="text-3xl font-bold text-slate-800 tracking-tight">${calculateTotal().toFixed(2)}</span>
           </div>
           
-          <button 
-            onClick={handleCheckout}
-            disabled={cart.length === 0}
-            className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-slate-900/10 transition-all flex justify-center items-center gap-2"
-          >
-            Emitir Nota de Venta
-          </button>
+          <div className="flex gap-2">
+            <button 
+                onClick={handleCreateQuotation}
+                disabled={cart.length === 0}
+                className="flex-1 bg-white border-2 border-slate-200 text-slate-700 hover:bg-slate-50 disabled:bg-slate-100 disabled:text-slate-300 py-3.5 rounded-xl font-bold text-sm shadow-sm transition-all flex justify-center items-center gap-2"
+                title="Guardar como Cotización (No descuenta stock)"
+            >
+                <FileText size={18} /> Cotizar
+            </button>
+            <button 
+                onClick={handleCheckout}
+                disabled={cart.length === 0}
+                className="flex-[2] bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-slate-900/10 transition-all flex justify-center items-center gap-2"
+            >
+                Emitir Nota
+            </button>
+          </div>
         </div>
       </div>
 
@@ -655,6 +704,42 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Quotations List Modal */}
+      {showQuotationsModal && quotations && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
+                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                    <h3 className="font-bold text-lg flex items-center gap-2"><FileText size={20}/> Cotizaciones Guardadas</h3>
+                    <button onClick={() => setShowQuotationsModal(false)}><X size={20}/></button>
+                </div>
+                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                    {quotations.length === 0 ? (
+                        <p className="text-center text-slate-400 py-8">No hay cotizaciones guardadas.</p>
+                    ) : (
+                        quotations.map(q => (
+                            <div key={q.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors flex justify-between items-center">
+                                <div>
+                                    <p className="font-bold text-slate-800">{q.customerName}</p>
+                                    <p className="text-xs text-slate-500">{new Date(q.date).toLocaleDateString()} - {q.items.length} items</p>
+                                </div>
+                                <div className="flex items-center gap-3">
+                                    <span className="font-bold text-slate-900">${q.total.toFixed(2)}</span>
+                                    <button 
+                                        onClick={() => loadQuotation(q)}
+                                        className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
+                                        title="Cargar Cotización al Carrito"
+                                    >
+                                        <Download size={16}/>
+                                    </button>
+                                </div>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
         </div>
       )}
     </div>

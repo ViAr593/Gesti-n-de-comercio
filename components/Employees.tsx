@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Employee } from '../types';
-import { Plus, Edit, Trash2, Shield, User, Briefcase, Mail, Phone } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, User, Briefcase, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface EmployeesProps {
   employees: Employee[];
@@ -11,15 +11,48 @@ interface EmployeesProps {
 export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
+  
   const [formData, setFormData] = useState<Omit<Employee, 'id'>>({
     name: '',
     email: '',
     phone: '',
-    role: 'VENDEDOR'
+    role: 'VENDEDOR',
+    password: ''
   });
+
+  const [passwordError, setPasswordError] = useState('');
+
+  // Validación: > 6 chars (7+), 1 letra, 1 numero, 1 especial (*,/,-,+,#,@)
+  const validatePassword = (pwd: string) => {
+    // Regex explanation:
+    // (?=.*[a-zA-Z]) -> At least one letter
+    // (?=.*\d) -> At least one number
+    // (?=.*[*\/+\-#@]) -> At least one of the specific special chars
+    // .{7,} -> Length at least 7
+    const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[*\/+\-#@]).{7,}$/;
+    
+    if (!regex.test(pwd)) {
+      setPasswordError('La contraseña debe tener más de 6 caracteres, incluir al menos una letra, un número y un carácter especial (*, /, -, +, #, @).');
+      return false;
+    }
+    setPasswordError('');
+    return true;
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate password only if it's a new user or if password field is modified
+    if (formData.password) {
+        if (!validatePassword(formData.password)) {
+            return;
+        }
+    } else if (!editingId) {
+        setPasswordError('La contraseña es obligatoria para nuevos usuarios.');
+        return;
+    }
+
     if (editingId) {
       setEmployees(employees.map(emp => emp.id === editingId ? { ...formData, id: editingId } : emp));
     } else {
@@ -35,17 +68,20 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
   };
 
   const openModal = (employee?: Employee) => {
+    setPasswordError('');
+    setShowPassword(false);
     if (employee) {
       setEditingId(employee.id);
       setFormData({
         name: employee.name,
         email: employee.email,
         phone: employee.phone,
-        role: employee.role
+        role: employee.role,
+        password: employee.password || ''
       });
     } else {
       setEditingId(null);
-      setFormData({ name: '', email: '', phone: '', role: 'VENDEDOR' });
+      setFormData({ name: '', email: '', phone: '', role: 'VENDEDOR', password: '' });
     }
     setIsModalOpen(true);
   };
@@ -143,6 +179,48 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
                   />
                 </div>
                 <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                  <input 
+                    required
+                    type="email" 
+                    value={formData.email}
+                    onChange={e => setFormData({...formData, email: e.target.value})}
+                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
+                  />
+                </div>
+                
+                {/* PASSWORD FIELD */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-700 mb-1">Contraseña de Acceso</label>
+                  <div className="relative">
+                    <input 
+                        type={showPassword ? "text" : "password"}
+                        value={formData.password}
+                        onChange={e => {
+                            setFormData({...formData, password: e.target.value});
+                            if(passwordError) setPasswordError('');
+                        }}
+                        placeholder={editingId ? "Dejar en blanco para mantener actual" : "Crear contraseña"}
+                        className={`w-full px-3 py-2 border rounded-lg focus:ring-2 outline-none pr-10 ${passwordError ? 'border-red-300 focus:ring-red-200' : 'border-slate-200 focus:ring-slate-500'}`}
+                    />
+                    <button 
+                        type="button" 
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    >
+                        {showPassword ? <EyeOff size={16}/> : <Eye size={16}/>}
+                    </button>
+                  </div>
+                  {passwordError ? (
+                      <p className="text-xs text-red-500 mt-1">{passwordError}</p>
+                  ) : (
+                      <p className="text-[10px] text-slate-400 mt-1">
+                        Requisito: &gt;6 caracteres, 1 número, 1 letra, 1 símbolo (*, /, -, +, #, @)
+                      </p>
+                  )}
+                </div>
+
+                <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Rol / Acceso</label>
                   <select 
                     value={formData.role}
@@ -153,16 +231,6 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
                     <option value="ADMINISTRADOR">Administrador</option>
                     <option value="GERENTE_GENERAL">Gerente General</option>
                   </select>
-                  <p className="text-xs text-slate-500 mt-1">Define los permisos dentro de la aplicación.</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                  <input 
-                    type="email" 
-                    value={formData.email}
-                    onChange={e => setFormData({...formData, email: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-slate-500 outline-none"
-                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Teléfono</label>

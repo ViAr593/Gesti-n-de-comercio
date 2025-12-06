@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee } from './types';
+import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
 import { Inventory } from './components/Inventory';
@@ -10,80 +10,38 @@ import { Suppliers } from './components/Suppliers';
 import { Expenses } from './components/Expenses';
 import { Customers } from './components/Customers';
 import { Employees } from './components/Employees';
+import { Tools } from './components/Tools';
+import { Login } from './components/Login'; // Import Login
 import { Menu } from 'lucide-react';
+import { db } from './services/db'; 
 
 const App: React.FC = () => {
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  // -- STATE MOCKED PERSISTENCE --
-  const [products, setProducts] = useState<Product[]>(() => {
-    const saved = localStorage.getItem('products');
-    return saved ? JSON.parse(saved) : [
-      { id: '1', name: 'Laptop Gaming', description: 'Alta potencia', price: 1200, cost: 800, stock: 5, minStock: 2, category: 'Electrónica', supplierId: 's1', measurementUnit: 'UNIDAD', measurementValue: 1 },
-      { id: '2', name: 'Coca Cola', description: 'Refresco', price: 2, cost: 1, stock: 50, minStock: 10, category: 'Bebidas', supplierId: 's1', measurementUnit: 'ML', measurementValue: 500 }
-    ];
-  });
+  // -- INITIALIZE STATE FROM DB SERVICE --
+  const [products, setProducts] = useState<Product[]>(() => db.products.getAll());
+  const [suppliers, setSuppliers] = useState<Supplier[]>(() => db.suppliers.getAll());
+  const [customers, setCustomers] = useState<Customer[]>(() => db.customers.getAll());
+  const [employees, setEmployees] = useState<Employee[]>(() => db.employees.getAll());
+  const [sales, setSales] = useState<Sale[]>(() => db.sales.getAll());
+  const [expenses, setExpenses] = useState<Expense[]>(() => db.expenses.getAll());
+  const [quotations, setQuotations] = useState<Quotation[]>(() => db.quotations.getAll());
 
-  const [suppliers, setSuppliers] = useState<Supplier[]>(() => {
-    const saved = localStorage.getItem('suppliers');
-    return saved ? JSON.parse(saved) : [
-      { id: 's1', name: 'TechDistribuidora S.A.', contactName: 'Juan Pérez', phone: '555-1234', email: 'ventas@tech.com' }
-    ];
-  });
+  // -- PERSIST CHANGES TO DB SERVICE --
+  useEffect(() => { db.products.set(products); }, [products]);
+  useEffect(() => { db.suppliers.set(suppliers); }, [suppliers]);
+  useEffect(() => { db.sales.set(sales); }, [sales]);
+  useEffect(() => { db.expenses.set(expenses); }, [expenses]);
+  useEffect(() => { db.customers.set(customers); }, [customers]);
+  useEffect(() => { db.employees.set(employees); }, [employees]);
+  useEffect(() => { db.quotations.set(quotations); }, [quotations]);
 
-  const [customers, setCustomers] = useState<Customer[]>(() => {
-    const saved = localStorage.getItem('customers');
-    return saved ? JSON.parse(saved) : [
-      { id: 'c1', name: 'Consumidor Final', taxId: '999999999', email: '', phone: '', address: '' }
-    ];
-  });
-
-  const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem('employees');
-    return saved ? JSON.parse(saved) : [
-      { id: 'e1', name: 'Admin', email: 'admin@gestorpro.com', phone: '', role: 'GERENTE_GENERAL' }
-    ];
-  });
-
-  const [sales, setSales] = useState<Sale[]>(() => {
-    const saved = localStorage.getItem('sales');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  const [expenses, setExpenses] = useState<Expense[]>(() => {
-    const saved = localStorage.getItem('expenses');
-    return saved ? JSON.parse(saved) : [];
-  });
-
-  useEffect(() => {
-    localStorage.setItem('products', JSON.stringify(products));
-  }, [products]);
-
-  useEffect(() => {
-    localStorage.setItem('suppliers', JSON.stringify(suppliers));
-  }, [suppliers]);
-
-  useEffect(() => {
-    localStorage.setItem('sales', JSON.stringify(sales));
-  }, [sales]);
-
-  useEffect(() => {
-    localStorage.setItem('expenses', JSON.stringify(expenses));
-  }, [expenses]);
-
-  useEffect(() => {
-    localStorage.setItem('customers', JSON.stringify(customers));
-  }, [customers]);
-
-  useEffect(() => {
-    localStorage.setItem('employees', JSON.stringify(employees));
-  }, [employees]);
-
-  // -- LOGIC --
+  // -- BUSINESS LOGIC --
   const handleCompleteSale = (newSale: Sale) => {
     setSales(prev => [...prev, newSale]);
-    // Reduce Stock
+    // Reduce Stock Automatically
     setProducts(prevProducts => prevProducts.map(p => {
       const itemInCart = newSale.items.find(item => item.id === p.id);
       if (itemInCart) {
@@ -110,7 +68,9 @@ const App: React.FC = () => {
           products={products} 
           customers={customers} 
           onCompleteSale={handleCompleteSale} 
-          setExpenses={setExpenses} // Passed prop
+          setExpenses={setExpenses}
+          quotations={quotations}
+          setQuotations={setQuotations}
         />;
       case 'EXPENSES':
         return <Expenses expenses={expenses} setExpenses={setExpenses} />;
@@ -122,10 +82,16 @@ const App: React.FC = () => {
         return <Customers customers={customers} setCustomers={setCustomers} />;
       case 'EMPLOYEES':
         return <Employees employees={employees} setEmployees={setEmployees} />;
+      case 'TOOLS':
+        return <Tools products={products} />;
       default:
         return <Dashboard sales={sales} expenses={expenses} products={products} />;
     }
   };
+
+  if (!isAuthenticated) {
+    return <Login onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
 
   return (
     <div className="flex h-[100dvh] bg-slate-50 text-slate-900 font-sans overflow-hidden">

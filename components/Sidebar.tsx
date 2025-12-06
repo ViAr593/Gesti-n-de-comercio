@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, Package, ShoppingCart, Users, History, Store, Wallet, UserCircle, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Package, ShoppingCart, Users, History, Store, Wallet, UserCircle, Briefcase, Wrench } from 'lucide-react';
 import { ViewState } from '../types';
 
 interface SidebarProps {
@@ -17,6 +17,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView }) => {
     { id: 'CUSTOMERS', label: 'Clientes', icon: UserCircle },
     { id: 'SUPPLIERS', label: 'Proveedores', icon: Store },
     { id: 'EMPLOYEES', label: 'Empleados', icon: Briefcase },
+    { id: 'TOOLS', label: 'Herramientas', icon: Wrench },
     { id: 'SALES_HISTORY', label: 'Movimientos', icon: History },
   ];
 

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Customer } from '../types';
-import { Plus, Edit, Trash2, User, Phone, Mail, MapPin, FileText } from 'lucide-react';
+import { Plus, Edit, Trash2, User, Phone, Mail, MapPin, FileText, Smartphone } from 'lucide-react';
 
 interface CustomersProps {
   customers: Customer[];
@@ -55,6 +55,34 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
   const closeModal = () => {
     setIsModalOpen(false);
     setEditingId(null);
+  };
+
+  const handleImportContact = async () => {
+    // Feature detection for Mobile Contacts API
+    // Note: This only works in secure contexts (HTTPS) and supported mobile browsers (Chrome Android, iOS Safari 14.5+)
+    if ('contacts' in navigator && 'ContactsManager' in window) {
+      try {
+        const props = ['name', 'tel', 'email'];
+        const opts = { multiple: false };
+        
+        // @ts-ignore - The contacts API is experimental in some TS libs
+        const contacts = await navigator.contacts.select(props, opts);
+        
+        if (contacts && contacts.length > 0) {
+          const contact = contacts[0];
+          setFormData({
+            ...formData,
+            name: contact.name ? contact.name[0] : '',
+            phone: contact.tel ? contact.tel[0] : '',
+            email: contact.email ? contact.email[0] : ''
+          });
+        }
+      } catch (ex) {
+        alert("No se pudo acceder a los contactos o se canceló la operación.");
+      }
+    } else {
+      alert("Esta función solo está disponible en dispositivos móviles compatibles.");
+    }
   };
 
   return (
@@ -151,16 +179,27 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
               </h3>
               
               <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-1">Nombre Completo / Razón Social</label>
-                  <input 
-                    required
-                    type="text" 
-                    value={formData.name}
-                    onChange={e => setFormData({...formData, name: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                  />
+                <div className="flex items-end gap-2">
+                    <div className="flex-1">
+                        <label className="block text-sm font-medium text-slate-700 mb-1">Nombre Completo / Razón Social</label>
+                        <input 
+                            required
+                            type="text" 
+                            value={formData.name}
+                            onChange={e => setFormData({...formData, name: e.target.value})}
+                            className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                    </div>
+                    <button 
+                        type="button" 
+                        onClick={handleImportContact}
+                        className="bg-slate-100 p-2.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-200 mb-0.5"
+                        title="Importar desde Contactos (Móvil)"
+                    >
+                        <Smartphone size={20} />
+                    </button>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Documento (RUT/NIT/DNI)</label>
                   <input 
