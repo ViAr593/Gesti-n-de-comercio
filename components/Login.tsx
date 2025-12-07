@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, ArrowRight, User } from 'lucide-react';
+import { Lock, ArrowRight, User, Loader2 } from 'lucide-react';
 import { db } from '../services/db';
 import { Employee } from '../types';
 
@@ -11,15 +11,26 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const user = db.auth.login(email, password);
-    if (user) {
-      onLoginSuccess(user);
-    } else {
+    setIsLoading(true);
+    setError(false);
+    
+    try {
+      const user = await db.auth.login(email, password);
+      if (user) {
+        onLoginSuccess(user);
+      } else {
+        setError(true);
+        setPassword('');
+      }
+    } catch (err) {
+      console.error(err);
       setError(true);
-      setPassword('');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -74,9 +85,10 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
 
           <button 
             type="submit"
-            className="w-full bg-slate-900 hover:bg-slate-800 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all mt-4"
+            disabled={isLoading}
+            className="w-full bg-slate-900 hover:bg-slate-800 disabled:bg-slate-600 text-white py-3.5 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition-all mt-4"
           >
-            Ingresar al Sistema <ArrowRight size={20} />
+            {isLoading ? <Loader2 className="animate-spin" /> : <>Ingresar al Sistema <ArrowRight size={20} /></>}
           </button>
         </form>
 

@@ -1,8 +1,8 @@
-
 import React, { useState } from 'react';
 import { Employee } from '../types';
-import { Plus, Edit, Trash2, Shield, User, Briefcase, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { Plus, Edit, Trash2, Shield, User, Briefcase, Mail, Phone, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
 import { hasPermission } from '../services/rbac';
+import { hashPassword } from '../services/db';
 
 interface EmployeesProps {
   employees: Employee[];
@@ -14,6 +14,7 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees, c
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   const [formData, setFormData] = useState<Omit<Employee, 'id'>>({
     name: '',
@@ -39,26 +40,46 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees, c
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId && !canEdit) return;
     if (!editingId && !canCreate) return;
     
-    // Validate password only if it's a new user or if password field is modified
+    setIsProcessing(true);
+
+    let finalPassword = formData.password;
+
+    // Logic for Password Hashing
     if (formData.password) {
+        // Validate strength
         if (!validatePassword(formData.password)) {
+            setIsProcessing(false);
             return;
         }
+        // Hash it
+        finalPassword = await hashPassword(formData.password);
     } else if (!editingId) {
+        // New user must have password
         setPasswordError('La contraseña es obligatoria para nuevos usuarios.');
+        setIsProcessing(false);
         return;
+    } else {
+        // Editing existing user, password field empty = keep existing password
+        const existingUser = employees.find(e => e.id === editingId);
+        finalPassword = existingUser?.password || ''; 
     }
 
+    const employeeData = {
+        ...formData,
+        password: finalPassword
+    };
+
     if (editingId) {
-      setEmployees(employees.map(emp => emp.id === editingId ? { ...formData, id: editingId } : emp));
+      setEmployees(employees.map(emp => emp.id === editingId ? { ...employeeData, id: editingId } : emp));
     } else {
-      setEmployees([...employees, { ...formData, id: crypto.randomUUID() }]);
+      setEmployees([...employees, { ...employeeData, id: crypto.randomUUID() }]);
     }
+    setIsProcessing(false);
     closeModal();
   };
 
@@ -80,7 +101,7 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees, c
         email: employee.email,
         phone: employee.phone,
         role: employee.role,
-        password: employee.password || ''
+        password: '' // Don't show hashed password
       });
     } else {
       if(!canCreate) return;
@@ -260,15 +281,17 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees, c
                 <button 
                   type="button" 
                   onClick={closeModal}
+                  disabled={isProcessing}
                   className="px-4 py-2 text-slate-600 hover:bg-slate-100 rounded-lg font-medium"
                 >
                   Cancelar
                 </button>
                 <button 
                   type="submit"
-                  className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium"
+                  disabled={isProcessing}
+                  className="px-4 py-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 font-medium flex items-center gap-2"
                 >
-                  Guardar
+                  {isProcessing ? <Loader2 className="animate-spin w-4 h-4"/> : 'Guardar'}
                 </button>
               </div>
             </form>
