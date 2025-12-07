@@ -1,13 +1,16 @@
+
 import React, { useState } from 'react';
-import { Supplier } from '../types';
+import { Supplier, Employee } from '../types';
 import { Plus, Edit, Trash2, Phone, Mail } from 'lucide-react';
+import { hasPermission } from '../services/rbac';
 
 interface SuppliersProps {
   suppliers: Supplier[];
   setSuppliers: (suppliers: Supplier[]) => void;
+  currentUser: Employee | null;
 }
 
-export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers }) => {
+export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Omit<Supplier, 'id'>>({
@@ -17,17 +20,24 @@ export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers })
     email: ''
   });
 
+  const canCreate = hasPermission(currentUser, 'SUPPLIERS', 'create');
+  const canEdit = hasPermission(currentUser, 'SUPPLIERS', 'edit');
+  const canDelete = hasPermission(currentUser, 'SUPPLIERS', 'delete');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
+      if(!canEdit) return;
       setSuppliers(suppliers.map(s => s.id === editingId ? { ...formData, id: editingId } : s));
     } else {
+      if(!canCreate) return;
       setSuppliers([...suppliers, { ...formData, id: crypto.randomUUID() }]);
     }
     closeModal();
   };
 
   const handleDelete = (id: string) => {
+    if(!canDelete) return;
     if (confirm('¿Eliminar proveedor?')) {
       setSuppliers(suppliers.filter(s => s.id !== id));
     }
@@ -35,6 +45,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers })
 
   const openModal = (supplier?: Supplier) => {
     if (supplier) {
+      if(!canEdit) return;
       setEditingId(supplier.id);
       setFormData({
         name: supplier.name,
@@ -43,6 +54,7 @@ export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers })
         email: supplier.email
       });
     } else {
+      if(!canCreate) return;
       setEditingId(null);
       setFormData({ name: '', contactName: '', phone: '', email: '' });
     }
@@ -61,12 +73,14 @@ export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers })
           <h2 className="text-2xl font-bold text-slate-800">Proveedores</h2>
           <p className="text-slate-500 text-sm">Directorio de proveedores y contactos</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-        >
-          <Plus size={18} /> Agregar Proveedor
-        </button>
+        {canCreate && (
+            <button 
+            onClick={() => openModal()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            >
+            <Plus size={18} /> Agregar Proveedor
+            </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -78,12 +92,16 @@ export const Suppliers: React.FC<SuppliersProps> = ({ suppliers, setSuppliers })
                 <p className="text-sm text-slate-500">Contacto: {supplier.contactName}</p>
               </div>
               <div className="flex gap-2">
-                <button onClick={() => openModal(supplier)} className="p-1 hover:bg-slate-100 rounded text-slate-500">
-                  <Edit size={16} />
-                </button>
-                <button onClick={() => handleDelete(supplier.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
-                  <Trash2 size={16} />
-                </button>
+                {canEdit && (
+                    <button onClick={() => openModal(supplier)} className="p-1 hover:bg-slate-100 rounded text-slate-500">
+                    <Edit size={16} />
+                    </button>
+                )}
+                {canDelete && (
+                    <button onClick={() => handleDelete(supplier.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
+                    <Trash2 size={16} />
+                    </button>
+                )}
               </div>
             </div>
             

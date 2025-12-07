@@ -1,7 +1,9 @@
-
-import React, { useState } from 'react';
-import { Product, CartItem, Sale, Customer, Expense, Quotation, BusinessConfig } from '../types';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown, FileText, Download, Check } from 'lucide-react';
+import React, { useState, useRef } from 'react';
+import { Product, CartItem, Sale, Customer, Expense, Quotation, BusinessConfig, Employee } from '../types';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown, FileText, Download, Check, Share2, Image as ImageIcon, FileDown } from 'lucide-react';
+import { hasPermission } from '../services/rbac';
+import html2canvas from 'html2canvas';
+import { jsPDF } from 'jspdf';
 
 interface POSProps {
   products: Product[];
@@ -11,9 +13,10 @@ interface POSProps {
   quotations?: Quotation[];
   setQuotations?: React.Dispatch<React.SetStateAction<Quotation[]>>;
   businessConfig?: BusinessConfig;
+  currentUser: Employee | null;
 }
 
-export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSale, setExpenses, quotations, setQuotations, businessConfig }) => {
+export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSale, setExpenses, quotations, setQuotations, businessConfig, currentUser }) => {
   const [cart, setCart] = useState<CartItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [customerSearch, setCustomerSearch] = useState('');
@@ -42,6 +45,14 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
   // Quotation State
   const [showQuotationsModal, setShowQuotationsModal] = useState(false);
 
+  // Receipt Ref for PDF/Image generation
+  const receiptRef = useRef<HTMLDivElement>(null);
+
+  // PERMISSIONS
+  const canApplyDiscount = hasPermission(currentUser, 'POS', 'apply_discount');
+  const canAddManualItem = hasPermission(currentUser, 'POS', 'manual_item');
+  const canCreateExpense = hasPermission(currentUser, 'EXPENSES', 'create');
+
   const addToCart = (product: Product) => {
     if (product.stock <= 0) return;
     setCart(prev => {
@@ -54,6 +65,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
   };
 
   const addManualItem = () => {
+    if (!canAddManualItem) return;
     const price = parseFloat(manualItemPrice);
     if (!manualItemName || isNaN(price) || price <= 0) return;
 
@@ -129,6 +141,75 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
     setIsMobileCartOpen(false);
   };
 
+  const generateWhatsAppMessage = (items: CartItem[], total: number, id: string, type: 'VENTA' | 'COTIZACION', customerName?: string) => {
+    let message = `*${businessConfig?.name || 'GestorPro'}*\n`;
+    message += `${type === 'VENTA' ? '🧾 NOTA DE VENTA' : '📄 COTIZACIÓN'} #${id.slice(0, 8).toUpperCase()}\n`;
+    message += `Fecha: ${new Date().toLocaleDateString()}\n`;
+    if(customerName) message += `Cliente: ${customerName}\n`;
+    message += `------------------------------\n`;
+    
+    items.forEach(item => {
+        message += `▪ ${item.quantity}x ${item.name} ($${item.price.toFixed(2)})\n`;
+    });
+    
+    message += `------------------------------\n`;
+    message += `*TOTAL: ${businessConfig?.currencySymbol || '$'}${total.toFixed(2)}*\n\n`;
+    message += `Gracias por su preferencia.`;
+    
+    return encodeURIComponent(message);
+  };
+
+  const shareReceiptWhatsApp = () => {
+    if (!showReceipt) return;
+    const msg = generateWhatsAppMessage(showReceipt.items, showReceipt.total, showReceipt.id, 'VENTA', showReceipt.customerName);
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  };
+
+  const shareQuotationWhatsApp = (q: Quotation) => {
+    const msg = generateWhatsAppMessage(q.items, q.total, q.id, 'COTIZACION', q.customerName);
+    window.open(`https://wa.me/?text=${msg}`, '_blank');
+  };
+
+  const downloadReceiptImage = async () => {
+    if (receiptRef.current) {
+        try {
+            const canvas = await html2canvas(receiptRef.current, { backgroundColor: '#ffffff', scale: 2 });
+            const link = document.createElement('a');
+            link.download = `recibo-${showReceipt?.id.slice(0,8)}.png`;
+            link.href = canvas.toDataURL('image/png');
+            link.click();
+        } catch (err) {
+            console.error(err);
+            alert("Error al generar imagen");
+        }
+    }
+  };
+
+  const downloadReceiptPDF = async () => {
+    if (receiptRef.current) {
+        try {
+            const canvas = await html2canvas(receiptRef.current, { backgroundColor: '#ffffff', scale: 2 });
+            const imgData = canvas.toDataURL('image/png');
+            
+            // Standard A4 or receipt size, here we calculate aspect ratio
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: [80, 200] // aprox receipt roll width
+            });
+            
+            const pdfWidth = pdf.internal.pageSize.getWidth();
+            const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+            
+            pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+            pdf.save(`recibo-${showReceipt?.id.slice(0,8)}.pdf`);
+        } catch (err) {
+            console.error(err);
+            alert("Error al generar PDF");
+        }
+    }
+  };
+
   const handleCreateQuotation = () => {
     if (cart.length === 0 || !setQuotations) return;
     const customerName = selectedCustomer ? selectedCustomer.name : (customerSearch.trim() || 'Cliente General');
@@ -143,7 +224,12 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
     };
     
     setQuotations(prev => [quotation, ...prev]);
-    alert('Cotización guardada exitosamente.');
+    
+    // Ask to share immediately
+    if(confirm('Cotización guardada. ¿Desea compartirla por WhatsApp ahora?')) {
+        shareQuotationWhatsApp(quotation);
+    }
+    
     clearCart();
   };
 
@@ -158,7 +244,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
   };
 
   const handleCreateExpense = () => {
-    if (!setExpenses) return;
+    if (!setExpenses || !canCreateExpense) return;
     const amount = parseFloat(expenseData.amount);
     if (!expenseData.description || isNaN(amount) || amount <= 0) return;
 
@@ -194,7 +280,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
       updateCartItem(editingItem.id, { 
         price, 
         quantity: qty,
-        discount: isNaN(disc) ? 0 : disc 
+        discount: isNaN(disc) || !canApplyDiscount ? 0 : disc 
       });
     }
     setEditingItem(null);
@@ -215,28 +301,26 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
     setCustomerSearch(customer.name);
   };
 
-  // Calculations for Mobile Summary
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
   const totalAmount = calculateTotal();
 
-  // Receipt Modal Component (Reused logic)
   if (showReceipt) {
     return (
       <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/80 p-4 backdrop-blur-sm">
         <div className="bg-white rounded-lg shadow-2xl max-w-sm w-full relative overflow-hidden flex flex-col max-h-[90vh]">
-          {/* Receipt Header */}
-          <div className="bg-slate-900 text-white p-4 text-center relative print:bg-white print:text-black">
-            <button onClick={() => setShowReceipt(null)} className="absolute top-4 right-4 p-1 hover:bg-slate-800 rounded-full print:hidden">
+          {/* Receipt Header Actions */}
+          <div className="bg-slate-900 text-white p-4 flex justify-between items-center print:hidden">
+            <h2 className="font-bold">Nota de Venta</h2>
+            <button onClick={() => setShowReceipt(null)} className="p-1 hover:bg-slate-800 rounded-full">
               <X size={20} className="text-white" />
             </button>
-            <h2 className="text-xl font-bold uppercase tracking-widest">NOTA DE VENTA</h2>
-            <p className="text-xs text-slate-400 mt-1">GestorPro Business</p>
           </div>
           
-          <div className="p-6 overflow-y-auto font-mono text-sm bg-white">
+          {/* Printable Area */}
+          <div ref={receiptRef} id="receipt-content" className="p-6 overflow-y-auto font-mono text-sm bg-white">
             <div className="text-center mb-6 pb-4 border-b border-dashed border-slate-300">
               {businessConfig?.logo && (
-                  <img src={businessConfig.logo} alt="Logo" className="h-12 mx-auto mb-2 opacity-80 grayscale" />
+                  <img src={businessConfig.logo} alt="Logo" className="h-12 mx-auto mb-2 grayscale" />
               )}
               <p className="font-bold text-lg">{businessConfig?.name || 'Mi Negocio Local'}</p>
               <p className="text-slate-500">ID: {businessConfig?.taxId || '999999999'}</p>
@@ -302,12 +386,19 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             )}
           </div>
 
-          <div className="p-4 bg-slate-50 border-t border-slate-200 flex gap-3 print:hidden">
-            <button onClick={() => window.print()} className="flex-1 bg-slate-900 text-white py-3 rounded-lg flex items-center justify-center gap-2 hover:bg-slate-800 font-medium">
-              <Printer size={18} /> Imprimir
+          {/* Action Buttons */}
+          <div className="p-4 bg-slate-50 border-t border-slate-200 grid grid-cols-2 gap-2 print:hidden">
+            <button onClick={shareReceiptWhatsApp} className="bg-green-600 text-white py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-green-700 text-xs font-bold">
+              <Share2 size={16} /> WhatsApp
             </button>
-            <button onClick={() => setShowReceipt(null)} className="flex-1 bg-white border border-slate-300 text-slate-700 py-3 rounded-lg hover:bg-slate-100 font-medium">
-              Cerrar
+            <button onClick={() => window.print()} className="bg-slate-800 text-white py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-slate-700 text-xs font-bold">
+              <Printer size={16} /> Imprimir
+            </button>
+            <button onClick={downloadReceiptPDF} className="bg-red-600 text-white py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-red-700 text-xs font-bold">
+              <FileDown size={16} /> PDF
+            </button>
+            <button onClick={downloadReceiptImage} className="bg-blue-600 text-white py-2 rounded-lg flex items-center justify-center gap-1 hover:bg-blue-700 text-xs font-bold">
+              <ImageIcon size={16} /> IMG (PNG)
             </button>
           </div>
         </div>
@@ -317,7 +408,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
 
   return (
     <div className="h-[100dvh] flex flex-col md:flex-row bg-slate-100 overflow-hidden relative">
-      {/* Product Grid Section */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
         {/* ACTION HEADER */}
         <div className="p-3 md:p-4 bg-white border-b border-slate-200 shadow-sm z-10 flex flex-col md:flex-row gap-3">
@@ -334,18 +424,22 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             >
               <FileText size={16} /> <span className="hidden sm:inline">Ver Cotizaciones</span>
             </button>
-             <button 
-              onClick={() => setShowExpenseModal(true)}
-              className="flex-1 md:flex-none px-3 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 flex items-center justify-center gap-2 whitespace-nowrap border border-red-200 transition-colors text-sm md:text-base"
-            >
-              <Wallet size={16} /> <span className="hidden sm:inline">Gasto</span>
-            </button>
-            <button 
-                onClick={() => setShowManualItemModal(true)}
-                className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap md:hidden text-sm md:text-base bg-white"
-            >
-                <Tag size={16} /> Manual
-            </button>
+            {canCreateExpense && (
+                <button 
+                onClick={() => setShowExpenseModal(true)}
+                className="flex-1 md:flex-none px-3 py-2 bg-red-50 text-red-600 font-bold rounded-lg hover:bg-red-100 flex items-center justify-center gap-2 whitespace-nowrap border border-red-200 transition-colors text-sm md:text-base"
+                >
+                <Wallet size={16} /> <span className="hidden sm:inline">Gasto</span>
+                </button>
+            )}
+            {canAddManualItem && (
+                <button 
+                    onClick={() => setShowManualItemModal(true)}
+                    className="flex-1 md:flex-none px-3 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 flex items-center justify-center gap-2 whitespace-nowrap md:hidden text-sm md:text-base bg-white"
+                >
+                    <Tag size={16} /> Manual
+                </button>
+            )}
           </div>
           
           <div className="relative flex-1">
@@ -357,12 +451,14 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
               onChange={(e) => setSearchTerm(e.target.value)}
             />
           </div>
-          <button 
-            onClick={() => setShowManualItemModal(true)}
-            className="hidden md:flex px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 items-center gap-2 whitespace-nowrap bg-white"
-          >
-            <Tag size={18} /> Item Manual
-          </button>
+          {canAddManualItem && (
+             <button 
+                onClick={() => setShowManualItemModal(true)}
+                className="hidden md:flex px-4 py-2 bg-slate-100 text-slate-700 font-medium rounded-lg hover:bg-slate-200 items-center gap-2 whitespace-nowrap bg-white"
+            >
+                <Tag size={18} /> Item Manual
+            </button>
+          )}
         </div>
         
         {/* Scrollable Product Grid */}
@@ -477,8 +573,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
                 <CheckCircle size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-green-600" />
               )}
             </div>
-            
-            {/* Customer Autocomplete Dropdown */}
             {filteredCustomers.length > 0 && (
               <div className="absolute bottom-full left-0 w-full bg-white border border-slate-200 rounded-lg shadow-xl mb-1 max-h-40 overflow-y-auto z-50">
                 {filteredCustomers.map(c => (
@@ -547,7 +641,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
         </div>
       </div>
 
-      {/* MOBILE STICKY FOOTER SUMMARY */}
       <div 
         className={`md:hidden fixed bottom-0 left-0 right-0 bg-slate-900 text-white p-4 shadow-[0_-4px_10px_rgba(0,0,0,0.2)] z-40 flex items-center justify-between cursor-pointer transition-transform duration-300 ${isMobileCartOpen ? 'translate-y-full' : 'translate-y-0'}`}
         onClick={() => setIsMobileCartOpen(true)}
@@ -561,8 +654,7 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
         </button>
       </div>
 
-      {/* Manual Item Modal */}
-      {showManualItemModal && (
+      {showManualItemModal && canAddManualItem && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
             <h3 className="text-xl font-bold mb-4">Item Manual</h3>
@@ -599,8 +691,50 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
         </div>
       )}
 
-      {/* QUICK EXPENSE MODAL */}
-      {showExpenseModal && (
+      {showQuotationsModal && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+              <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col">
+                  <div className="p-4 border-b border-slate-200 flex justify-between items-center">
+                      <h3 className="font-bold text-lg">Cotizaciones Guardadas</h3>
+                      <button onClick={() => setShowQuotationsModal(false)}><X size={20} className="text-slate-400"/></button>
+                  </div>
+                  <div className="flex-1 overflow-y-auto p-4">
+                      {(!quotations || quotations.length === 0) ? (
+                          <p className="text-center text-slate-400 py-8">No hay cotizaciones guardadas.</p>
+                      ) : (
+                          <div className="space-y-3">
+                              {quotations.map(q => (
+                                  <div key={q.id} className="border rounded-lg p-4 flex justify-between items-center hover:bg-slate-50">
+                                      <div>
+                                          <div className="font-bold text-slate-800">{q.customerName || 'Cliente General'}</div>
+                                          <div className="text-xs text-slate-500">{new Date(q.date).toLocaleDateString()} - {q.items.length} items</div>
+                                      </div>
+                                      <div className="flex items-center gap-3">
+                                          <span className="font-bold text-blue-600">${q.total.toFixed(2)}</span>
+                                          <button 
+                                            onClick={() => shareQuotationWhatsApp(q)} 
+                                            className="p-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200"
+                                            title="Compartir por WhatsApp"
+                                          >
+                                            <Share2 size={16} />
+                                          </button>
+                                          <button 
+                                            onClick={() => loadQuotation(q)} 
+                                            className="px-3 py-1.5 bg-slate-900 text-white rounded-lg text-sm hover:bg-slate-800"
+                                          >
+                                            Cargar
+                                          </button>
+                                      </div>
+                                  </div>
+                              ))}
+                          </div>
+                      )}
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {showExpenseModal && canCreateExpense && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6 border-2 border-red-500">
             <h3 className="text-xl font-bold mb-4 text-red-600 flex items-center gap-2">
@@ -647,7 +781,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
         </div>
       )}
 
-      {/* Edit Item Modal */}
       {editingItem && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
@@ -657,7 +790,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             </div>
             
             <div className="space-y-6">
-              {/* Quantity Control */}
               <div>
                 <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Cantidad</label>
                 <div className="flex items-center gap-2">
@@ -683,7 +815,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
                 </div>
               </div>
 
-              {/* Price Control */}
               <div className="grid grid-cols-2 gap-4">
                  <div>
                     <label className="block text-xs font-bold text-slate-500 uppercase mb-2">Precio Unitario ($)</label>
@@ -691,8 +822,9 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
                         type="number" 
                         step="0.01"
                         value={editPrice}
+                        disabled // Disabled manual price editing from here for now, or add permission check
                         onChange={e => setEditPrice(e.target.value)}
-                        className="w-full text-center py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 outline-none font-bold text-lg text-slate-800"
+                        className="w-full text-center py-2 border-2 border-slate-200 rounded-lg focus:border-blue-500 outline-none font-bold text-lg text-slate-800 bg-slate-50"
                     />
                  </div>
                  <div>
@@ -701,8 +833,9 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
                         type="number" 
                         step="0.01"
                         value={editDiscount}
+                        disabled={!canApplyDiscount}
                         onChange={e => setEditDiscount(e.target.value)}
-                        className="w-full text-center py-2 border-2 border-red-100 rounded-lg focus:border-red-500 outline-none font-bold text-lg text-red-600"
+                        className={`w-full text-center py-2 border-2 rounded-lg outline-none font-bold text-lg text-red-600 ${canApplyDiscount ? 'border-red-100 focus:border-red-500' : 'bg-slate-50 text-slate-400 border-slate-200'}`}
                     />
                  </div>
               </div>
@@ -722,42 +855,6 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
               </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Quotations List Modal */}
-      {showQuotationsModal && quotations && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-            <div className="bg-white rounded-xl shadow-xl w-full max-w-lg max-h-[80vh] flex flex-col">
-                <div className="p-4 border-b border-slate-200 flex justify-between items-center">
-                    <h3 className="font-bold text-lg flex items-center gap-2"><FileText size={20}/> Cotizaciones Guardadas</h3>
-                    <button onClick={() => setShowQuotationsModal(false)}><X size={20}/></button>
-                </div>
-                <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                    {quotations.length === 0 ? (
-                        <p className="text-center text-slate-400 py-8">No hay cotizaciones guardadas.</p>
-                    ) : (
-                        quotations.map(q => (
-                            <div key={q.id} className="border border-slate-200 rounded-lg p-3 hover:bg-slate-50 transition-colors flex justify-between items-center">
-                                <div>
-                                    <p className="font-bold text-slate-800">{q.customerName}</p>
-                                    <p className="text-xs text-slate-500">{new Date(q.date).toLocaleDateString()} - {q.items.length} items</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="font-bold text-slate-900">${q.total.toFixed(2)}</span>
-                                    <button 
-                                        onClick={() => loadQuotation(q)}
-                                        className="bg-blue-600 text-white p-2 rounded-lg hover:bg-blue-700"
-                                        title="Cargar Cotización al Carrito"
-                                    >
-                                        <Download size={16}/>
-                                    </button>
-                                </div>
-                            </div>
-                        ))
-                    )}
-                </div>
-            </div>
         </div>
       )}
     </div>

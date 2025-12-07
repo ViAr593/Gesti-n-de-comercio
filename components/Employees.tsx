@@ -1,16 +1,16 @@
 
-
-
 import React, { useState } from 'react';
 import { Employee } from '../types';
 import { Plus, Edit, Trash2, Shield, User, Briefcase, Mail, Phone, Lock, Eye, EyeOff } from 'lucide-react';
+import { hasPermission } from '../services/rbac';
 
 interface EmployeesProps {
   employees: Employee[];
   setEmployees: (employees: Employee[]) => void;
+  currentUser: Employee | null;
 }
 
-export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees }) => {
+export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
@@ -25,15 +25,12 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
 
   const [passwordError, setPasswordError] = useState('');
 
-  // Validación: > 6 chars (7+), 1 letra, 1 numero, 1 especial (*,/,-,+,#,@)
+  const canCreate = hasPermission(currentUser, 'EMPLOYEES', 'create');
+  const canEdit = hasPermission(currentUser, 'EMPLOYEES', 'edit');
+  const canDelete = hasPermission(currentUser, 'EMPLOYEES', 'delete');
+
   const validatePassword = (pwd: string) => {
-    // Regex explanation:
-    // (?=.*[a-zA-Z]) -> At least one letter
-    // (?=.*\d) -> At least one number
-    // (?=.*[*\/+\-#@]) -> At least one of the specific special chars
-    // .{7,} -> Length at least 7
     const regex = /^(?=.*[a-zA-Z])(?=.*\d)(?=.*[*\/+\-#@]).{7,}$/;
-    
     if (!regex.test(pwd)) {
       setPasswordError('La contraseña debe tener más de 6 caracteres, incluir al menos una letra, un número y un carácter especial (*, /, -, +, #, @).');
       return false;
@@ -44,6 +41,8 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingId && !canEdit) return;
+    if (!editingId && !canCreate) return;
     
     // Validate password only if it's a new user or if password field is modified
     if (formData.password) {
@@ -64,6 +63,7 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
   };
 
   const handleDelete = (id: string) => {
+    if(!canDelete) return;
     if (confirm('¿Eliminar empleado?')) {
       setEmployees(employees.filter(emp => emp.id !== id));
     }
@@ -73,6 +73,7 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
     setPasswordError('');
     setShowPassword(false);
     if (employee) {
+      if(!canEdit) return;
       setEditingId(employee.id);
       setFormData({
         name: employee.name,
@@ -82,6 +83,7 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
         password: employee.password || ''
       });
     } else {
+      if(!canCreate) return;
       setEditingId(null);
       setFormData({ name: '', email: '', phone: '', role: 'VENDEDOR', password: '' });
     }
@@ -113,12 +115,14 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
           <h2 className="text-2xl font-bold text-slate-800">Empleados</h2>
           <p className="text-slate-500 text-sm">Gestión de personal y niveles de acceso</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-        >
-          <Plus size={18} /> Agregar Empleado
-        </button>
+        {canCreate && (
+            <button 
+            onClick={() => openModal()}
+            className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            >
+            <Plus size={18} /> Agregar Empleado
+            </button>
+        )}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -135,12 +139,16 @@ export const Employees: React.FC<EmployeesProps> = ({ employees, setEmployees })
                 </div>
               </div>
               <div className="flex gap-1">
-                <button onClick={() => openModal(employee)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500">
-                  <Edit size={16} />
-                </button>
-                <button onClick={() => handleDelete(employee.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500">
-                  <Trash2 size={16} />
-                </button>
+                {canEdit && (
+                    <button onClick={() => openModal(employee)} className="p-1.5 hover:bg-slate-100 rounded text-slate-500">
+                    <Edit size={16} />
+                    </button>
+                )}
+                {canDelete && (
+                    <button onClick={() => handleDelete(employee.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500">
+                    <Trash2 size={16} />
+                    </button>
+                )}
               </div>
             </div>
             

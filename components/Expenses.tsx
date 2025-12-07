@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
-import { Expense } from '../types';
+import { Expense, Employee } from '../types';
 import { Plus, Trash2, Calendar, Wallet, Search } from 'lucide-react';
+import { hasPermission } from '../services/rbac';
 
 interface ExpensesProps {
   expenses: Expense[];
   setExpenses: (expenses: Expense[]) => void;
+  currentUser: Employee | null;
 }
 
-export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses }) => {
+export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   
@@ -18,10 +20,14 @@ export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses }) => 
     category: 'Operativo'
   });
 
+  const canCreate = hasPermission(currentUser, 'EXPENSES', 'create');
+  const canDelete = hasPermission(currentUser, 'EXPENSES', 'delete');
+
   const categories = ['Operativo', 'Mercadería', 'Servicios', 'Alquiler', 'Nómina', 'Otros'];
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!canCreate) return;
     const newExpense: Expense = {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
@@ -33,6 +39,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses }) => 
   };
 
   const handleDelete = (id: string) => {
+    if(!canDelete) return;
     if (confirm('¿Borrar este gasto?')) {
       setExpenses(expenses.filter(e => e.id !== id));
     }
@@ -57,12 +64,14 @@ export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses }) => 
              <span className="text-xs text-red-600 font-bold block">TOTAL GASTOS</span>
              <span className="text-lg font-bold text-red-700">${totalExpenses.toFixed(2)}</span>
            </div>
-           <button 
-            onClick={() => setIsModalOpen(true)}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-          >
-            <Plus size={18} /> Registrar Gasto
-          </button>
+           {canCreate && (
+             <button 
+                onClick={() => setIsModalOpen(true)}
+                className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+            >
+                <Plus size={18} /> Registrar Gasto
+            </button>
+           )}
         </div>
       </div>
 
@@ -110,9 +119,11 @@ export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses }) => 
                     -${expense.amount.toFixed(2)}
                   </td>
                   <td className="px-6 py-4 text-right">
-                    <button onClick={() => handleDelete(expense.id)} className="p-2 hover:bg-red-50 rounded text-red-500 transition-colors">
-                      <Trash2 size={16} />
-                    </button>
+                    {canDelete && (
+                        <button onClick={() => handleDelete(expense.id)} className="p-2 hover:bg-red-50 rounded text-red-500 transition-colors">
+                            <Trash2 size={16} />
+                        </button>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -129,7 +140,7 @@ export const Expenses: React.FC<ExpensesProps> = ({ expenses, setExpenses }) => 
         </div>
       </div>
 
-      {isModalOpen && (
+      {isModalOpen && canCreate && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md">
             <form onSubmit={handleSubmit} className="p-6">

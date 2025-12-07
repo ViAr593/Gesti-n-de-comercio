@@ -1,3 +1,5 @@
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation, BusinessConfig, InventoryLog } from './types';
 import { Sidebar } from './components/Sidebar';
@@ -11,6 +13,7 @@ import { Customers } from './components/Customers';
 import { Employees } from './components/Employees';
 import { Tools } from './components/Tools';
 import { Settings } from './components/Settings'; 
+import { WhatsAppStore } from './components/WhatsAppStore';
 import { Login } from './components/Login';
 import { Menu, Lock } from 'lucide-react';
 import { db } from './services/db'; 
@@ -134,7 +137,7 @@ const App: React.FC = () => {
           setProducts={setProducts} 
           inventoryLogs={inventoryLogs}
           setInventoryLogs={setInventoryLogs}
-          currentUser={currentUser} // Pass current user for RBAC and logging
+          currentUser={currentUser} 
         />;
       case 'POS':
         return <POS 
@@ -145,17 +148,20 @@ const App: React.FC = () => {
           quotations={quotations}
           setQuotations={setQuotations}
           businessConfig={businessConfig}
+          currentUser={currentUser}
         />;
+      case 'STORE':
+        return <WhatsAppStore products={products} config={businessConfig} />;
       case 'EXPENSES':
-        return <Expenses expenses={expenses} setExpenses={setExpenses} />;
+        return <Expenses expenses={expenses} setExpenses={setExpenses} currentUser={currentUser} />;
       case 'SALES_HISTORY':
-        return <SalesHistory sales={sales} onDeleteSale={handleDeleteSale} />;
+        return <SalesHistory sales={sales} onDeleteSale={handleDeleteSale} currentUser={currentUser} />;
       case 'SUPPLIERS':
-        return <Suppliers suppliers={suppliers} setSuppliers={setSuppliers} />;
+        return <Suppliers suppliers={suppliers} setSuppliers={setSuppliers} currentUser={currentUser} />;
       case 'CUSTOMERS':
-        return <Customers customers={customers} setCustomers={setCustomers} />;
+        return <Customers customers={customers} setCustomers={setCustomers} currentUser={currentUser} />;
       case 'EMPLOYEES':
-        return <Employees employees={employees} setEmployees={setEmployees} />;
+        return <Employees employees={employees} setEmployees={setEmployees} currentUser={currentUser} />;
       case 'TOOLS':
         return <Tools products={products} />;
       case 'SETTINGS':
@@ -208,13 +214,8 @@ const App: React.FC = () => {
             currentView={currentView} 
             setView={(v) => { setCurrentView(v); setMobileMenuOpen(false); }} 
             businessConfig={businessConfig}
+            currentUser={currentUser}
         />
-        {/* Manual Lock Button in Sidebar area (or accessible via Sidebar component if prop passed, but here we place it via context if needed, or just let auto-lock handle it. 
-           Ideally Sidebar should have a Logout button. Let's add a logout/lock capability by passing a prop or just rely on auto-lock for now to keep changes minimal to App.tsx)
-        */}
-        <div className="absolute bottom-4 left-4 z-50 md:hidden">
-             {/* Mobile Lock Button Placeholder if needed */}
-        </div>
       </div>
 
       {/* Main Content Area */}

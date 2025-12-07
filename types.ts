@@ -101,6 +101,7 @@ export interface BusinessConfig {
   logo?: string; // Base64 string
   theme?: 'light' | 'dark';
   openingHours?: OpeningHours;
+  whatsapp?: string; // New field for WhatsApp Order Store
 }
 
 export interface InventoryLog {
@@ -114,4 +115,4 @@ export interface InventoryLog {
   userName: string;
 }
 
-export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES' | 'TOOLS' | 'SETTINGS';
+export type ViewState = 'DASHBOARD' | 'INVENTORY' | 'POS' | 'SALES_HISTORY' | 'SUPPLIERS' | 'EXPENSES' | 'CUSTOMERS' | 'EMPLOYEES' | 'TOOLS' | 'SETTINGS' | 'STORE';

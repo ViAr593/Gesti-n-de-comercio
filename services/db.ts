@@ -84,6 +84,7 @@ const SEED_DATA = {
     address: 'Dirección Principal #123',
     phone: '555-0000',
     email: 'contacto@negocio.com',
+    whatsapp: '5550000', // Default Whatsapp
     receiptMessage: '¡Gracias por su compra!',
     currencySymbol: '$',
     theme: 'light',
@@ -151,10 +152,9 @@ export const db = {
   config: {
     get: () => {
         const config = load<BusinessConfig>(KEYS.CONFIG, SEED_DATA.config);
-        // Ensure structure for existing users without openingHours
-        if (!config.openingHours) {
-            config.openingHours = SEED_DATA.config.openingHours;
-        }
+        // Ensure structure for existing users without openingHours or whatsapp
+        if (!config.openingHours) config.openingHours = SEED_DATA.config.openingHours;
+        if (config.whatsapp === undefined) config.whatsapp = '';
         return config;
     },
     set: (data: BusinessConfig) => save(KEYS.CONFIG, data),

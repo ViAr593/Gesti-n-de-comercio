@@ -1,16 +1,20 @@
 
 import React from 'react';
-import { Sale } from '../types';
+import { Sale, Employee } from '../types';
 import { Calendar, CreditCard, DollarSign, Trash2 } from 'lucide-react';
+import { hasPermission } from '../services/rbac';
 
 interface SalesHistoryProps {
   sales: Sale[];
   onDeleteSale?: (saleId: string) => void;
+  currentUser: Employee | null;
 }
 
-export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale }) => {
+export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale, currentUser }) => {
   // Sort by date desc
   const sortedSales = [...sales].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+  const canDelete = hasPermission(currentUser, 'SALES_HISTORY', 'delete');
 
   return (
     <div className="p-6 max-w-6xl mx-auto">
@@ -26,7 +30,7 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale 
                 <th className="px-6 py-4">Items</th>
                 <th className="px-6 py-4">Método Pago</th>
                 <th className="px-6 py-4 text-right">Total</th>
-                {onDeleteSale && <th className="px-6 py-4 text-center">Acciones</th>}
+                {onDeleteSale && canDelete && <th className="px-6 py-4 text-center">Acciones</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -53,7 +57,7 @@ export const SalesHistory: React.FC<SalesHistoryProps> = ({ sales, onDeleteSale 
                   <td className="px-6 py-4 text-right font-bold text-slate-800">
                     ${sale.total.toFixed(2)}
                   </td>
-                  {onDeleteSale && (
+                  {onDeleteSale && canDelete && (
                     <td className="px-6 py-4 text-center">
                       <button 
                         onClick={() => onDeleteSale(sale.id)}

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Product, Supplier, InventoryLog, Employee } from '../types';
-import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon, Upload, X, Filter, RefreshCw, ClipboardList, ArrowUpCircle } from 'lucide-react';
+import { Plus, Edit, Trash2, Search, Wand2, Loader2, AlertTriangle, Scale, Archive, ArrowDownCircle, Printer, LayoutGrid, List, DollarSign, TrendingUp, Share2, ImageIcon, Upload, X, Filter, RefreshCw, ClipboardList, ArrowUpCircle, FileSpreadsheet } from 'lucide-react';
 import { generateProductDescription } from '../services/gemini';
+import { hasPermission } from '../services/rbac';
+import * as XLSX from 'xlsx';
 
 interface InventoryProps {
   products: Product[];
@@ -16,13 +18,13 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isStockModalOpen, setIsStockModalOpen] = useState(false);
   const [showOrderPreview, setShowOrderPreview] = useState(false);
-  const [showAuditLog, setShowAuditLog] = useState(false); // Toggle for Audit Log View
+  const [showAuditLog, setShowAuditLog] = useState(false);
   
   const [viewMode, setViewMode] = useState<'LIST' | 'CATALOG'>('LIST');
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [stockProduct, setStockProduct] = useState<Product | null>(null);
   const [stockEntryValue, setStockEntryValue] = useState('');
-  const [stockType, setStockType] = useState<'ENTRY' | 'EXIT'>('ENTRY'); // To handle Bodeguero In/Out
+  const [stockType, setStockType] = useState<'ENTRY' | 'EXIT'>('ENTRY');
   
   // -- FILTER STATES --
   const [searchTerm, setSearchTerm] = useState('');
@@ -34,12 +36,15 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   // -- FORM STATES --
   const [isGenerating, setIsGenerating] = useState(false);
 
-  // Role Checks
-  const isManager = currentUser?.role === 'GERENTE_GENERAL';
-  const isAdminOrManager = currentUser?.role === 'ADMINISTRADOR' || currentUser?.role === 'GERENTE_GENERAL';
-  // Bodeguero can see list and manage stock, but cannot edit prices or create products
-  const canEditProduct = isAdminOrManager;
-  const canManageStock = isAdminOrManager || currentUser?.role === 'BODEGUERO';
+  // -- FILE INPUT REF --
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // -- PERMISSIONS CHECK --
+  const canCreate = hasPermission(currentUser, 'INVENTORY', 'create');
+  const canEdit = hasPermission(currentUser, 'INVENTORY', 'edit');
+  const canDelete = hasPermission(currentUser, 'INVENTORY', 'delete');
+  const canManageStock = hasPermission(currentUser, 'INVENTORY', 'manage_stock');
+  const canAudit = hasPermission(currentUser, 'INVENTORY', 'audit');
 
   const initialFormState: Omit<Product, 'id'> = {
     name: '',
@@ -62,7 +67,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const totalInventoryValue = products.reduce((acc, p) => acc + (p.price * p.stock), 0);
   const potentialProfit = totalInventoryValue - totalInventoryCost;
 
-  // Derive Unique Categories for Filter
+  // Derive Unique Categories
   const uniqueCategories = Array.from(new Set(products.map(p => p.category).filter(Boolean))).sort();
 
   const handleGenerateDescription = async () => {
@@ -79,17 +84,14 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // Validate file type
       if (!file.type.startsWith('image/')) {
         alert('Por favor, seleccione un archivo de imagen válido.');
         return;
       }
-      // Validate file size (max 2MB)
       if (file.size > 2 * 1024 * 1024) {
         alert('La imagen es demasiado grande. El tamaño máximo permitido es 2MB.');
         return;
       }
-
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, image: reader.result as string }));
@@ -98,17 +100,99 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
     }
   };
 
+  const handleExcelUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const bstr = evt.target?.result;
+        const wb = XLSX.read(bstr, { type: 'binary' });
+        const wsName = wb.SheetNames[0];
+        const ws = wb.Sheets[wsName];
+        // Parse CSV/Excel data
+        const data = XLSX.utils.sheet_to_json(ws);
+        
+        let newProductsCount = 0;
+        const newProducts: Product[] = [];
+
+        data.forEach((row: any) => {
+            // Basic validation
+            if (row.Nombre && row.Precio) {
+                const newProduct: Product = {
+                    id: crypto.randomUUID(),
+                    name: row.Nombre || 'Sin Nombre',
+                    description: row.Descripcion || '',
+                    price: Number(row.Precio) || 0,
+                    cost: Number(row.Costo) || 0,
+                    stock: Number(row.Stock) || 0,
+                    minStock: Number(row.StockMinimo) || 5,
+                    category: row.Categoria || 'General',
+                    supplierId: '', // Default or find by name
+                    measurementUnit: (row.Unidad as any) || 'UNIDAD',
+                    measurementValue: Number(row.ValorMedida) || 1,
+                    image: ''
+                };
+                newProducts.push(newProduct);
+                newProductsCount++;
+            }
+        });
+
+        if (newProducts.length > 0) {
+            setProducts([...products, ...newProducts]);
+            
+            // Log entries
+            if (setInventoryLogs) {
+                const logs: InventoryLog[] = newProducts.map(p => ({
+                    id: crypto.randomUUID(),
+                    date: new Date().toISOString(),
+                    productId: p.id,
+                    productName: p.name,
+                    type: 'ENTRADA',
+                    quantity: p.stock,
+                    userId: currentUser?.id || 'system',
+                    userName: currentUser?.name || 'Importación Excel'
+                }));
+                setInventoryLogs(prev => [...logs, ...prev]);
+            }
+
+            alert(`Se han importado ${newProductsCount} productos correctamente.`);
+        } else {
+            alert("No se encontraron productos válidos en el archivo. Asegúrese de usar las columnas: Nombre, Precio, Costo, Stock, Categoria.");
+        }
+      } catch (error) {
+        console.error(error);
+        alert("Error al leer el archivo Excel.");
+      }
+    };
+    reader.readAsBinaryString(file);
+    if(fileInputRef.current) fileInputRef.current.value = ''; // Reset
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canEditProduct) return; // Guard for permission
+    if (!canCreate && !editingProduct) return;
+    if (!canEdit && editingProduct) return;
 
-    // Capture Previous State for Log if Editing
+    // DUPLICATE CHECK
+    const normalizedName = formData.name.trim().toLowerCase();
+    const normalizedCategory = formData.category.trim().toLowerCase();
+    const isDuplicate = products.some(p => 
+        p.name.trim().toLowerCase() === normalizedName && 
+        p.category.trim().toLowerCase() === normalizedCategory &&
+        p.id !== editingProduct?.id 
+    );
+    if (isDuplicate) {
+        alert(`Ya existe un producto llamado "${formData.name}" en la categoría "${formData.category}".`);
+        return;
+    }
+
     const oldProduct = editingProduct ? products.find(p => p.id === editingProduct.id) : null;
 
     if (editingProduct) {
       setProducts(products.map(p => p.id === editingProduct.id ? { ...formData, id: p.id } : p));
       
-      // Log manual adjustment if stock changed directly in form
       if (oldProduct && oldProduct.stock !== formData.stock && setInventoryLogs) {
           const diff = formData.stock - oldProduct.stock;
           const log: InventoryLog = {
@@ -129,7 +213,6 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
       const newProduct = { ...formData, id: newId };
       setProducts([...products, newProduct]);
       
-      // Log New Product Entry
       if (setInventoryLogs && newProduct.stock > 0) {
           const log: InventoryLog = {
             id: crypto.randomUUID(),
@@ -149,23 +232,20 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
 
   const handleStockUpdate = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!stockProduct) return;
+    if (!stockProduct || !canManageStock) return;
     const qty = parseFloat(stockEntryValue);
     if (isNaN(qty) || qty <= 0) return;
 
-    // Apply multiplier based on Entry or Exit
     const adjustment = stockType === 'ENTRY' ? qty : -qty;
-
     setProducts(products.map(p => p.id === stockProduct.id ? { ...p, stock: p.stock + adjustment } : p));
 
-    // LOGGING
     if (setInventoryLogs) {
         const log: InventoryLog = {
             id: crypto.randomUUID(),
             date: new Date().toISOString(),
             productId: stockProduct.id,
             productName: stockProduct.name,
-            type: stockType === 'ENTRY' ? 'ENTRADA' : 'AJUSTE', // Entry vs Exit/Adjustment
+            type: stockType === 'ENTRY' ? 'ENTRADA' : 'AJUSTE',
             quantity: adjustment,
             userId: currentUser?.id || 'unknown',
             userName: currentUser?.name || 'Unknown'
@@ -180,18 +260,17 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   };
 
   const handleDelete = (id: string) => {
-    if (!canEditProduct) return; // Guard
+    if (!canDelete) return;
     if (confirm('¿Está seguro de eliminar este producto?')) {
       const p = products.find(p => p.id === id);
       if (p && setInventoryLogs) {
-         // Log Deletion
          const log: InventoryLog = {
             id: crypto.randomUUID(),
             date: new Date().toISOString(),
             productId: id,
             productName: p.name,
             type: 'ELIMINACION',
-            quantity: -p.stock, // Log removal of remaining stock
+            quantity: -p.stock,
             userId: currentUser?.id || 'unknown',
             userName: currentUser?.name || 'Unknown'
         };
@@ -203,6 +282,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
 
   const openModal = (product?: Product) => {
     if (product) {
+      if(!canEdit) return;
       setEditingProduct(product);
       setFormData({
         name: product.name,
@@ -218,6 +298,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
         image: product.image || ''
       });
     } else {
+      if(!canCreate) return;
       setEditingProduct(null);
       setFormData(initialFormState);
     }
@@ -227,7 +308,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const openStockModal = (product: Product) => {
     setStockProduct(product);
     setStockEntryValue('');
-    setStockType('ENTRY'); // Reset to entry by default
+    setStockType('ENTRY'); 
     setIsStockModalOpen(true);
   };
 
@@ -246,22 +327,16 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
 
   // --- ADVANCED FILTERING LOGIC ---
   const filteredProducts = products.filter(p => {
-    // 1. Text Search
     const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           p.category.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // 2. Category Filter
     const matchesCategory = filterCategory ? p.category === filterCategory : true;
-
-    // 3. Supplier Filter
     const matchesSupplier = filterSupplier ? p.supplierId === filterSupplier : true;
 
-    // 4. Stock Level Filter
     let matchesStock = true;
     if (filterStock === 'LOW') {
         matchesStock = p.stock <= p.minStock;
     } else if (filterStock === 'HIGH') {
-        matchesStock = p.stock > (p.minStock * 3); // Example: High is > 3x min stock
+        matchesStock = p.stock > (p.minStock * 3);
     } else if (filterStock === 'MEDIUM') {
         matchesStock = p.stock > p.minStock && p.stock <= (p.minStock * 3);
     }
@@ -271,8 +346,8 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
 
   const lowStockProducts = products.filter(p => p.stock <= p.minStock);
 
-  // --- VIEW: AUDIT LOG (MANAGER ONLY) ---
-  if (showAuditLog && isManager) {
+  // --- VIEW: AUDIT LOG ---
+  if (showAuditLog && canAudit) {
     return (
         <div className="p-6 max-w-7xl mx-auto space-y-6">
             <div className="flex justify-between items-center">
@@ -350,11 +425,10 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
           <p className="text-slate-500 text-sm">Gestiona tus productos, costos y catálogo</p>
         </div>
         <div className="flex gap-2 w-full md:w-auto flex-wrap">
-            {isManager && (
+            {canAudit && (
                 <button 
                     onClick={() => setShowAuditLog(true)}
                     className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
-                    title="Ver Registro de Auditoría"
                 >
                     <ClipboardList size={18} />
                     <span className="hidden sm:inline text-sm font-medium">Auditoría</span>
@@ -366,14 +440,29 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
             >
             <Archive size={18} /> Sugerencia de Compra (OC)
             </button>
-            {/* Create Button only for Admin/Manager */}
-            {canEditProduct && (
-              <button 
-                onClick={() => openModal()}
-                className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm text-sm font-medium"
-              >
-                <Plus size={18} /> Nuevo
-              </button>
+            {canCreate && (
+             <>
+                 <button 
+                    onClick={() => fileInputRef.current?.click()}
+                    className="flex-1 md:flex-none bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm text-sm font-medium"
+                  >
+                    <FileSpreadsheet size={18} /> Importar Excel
+                  </button>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="hidden" 
+                    accept=".xlsx,.xls,.csv"
+                    onChange={handleExcelUpload}
+                  />
+
+                  <button 
+                    onClick={() => openModal()}
+                    className="flex-1 md:flex-none bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center justify-center gap-2 transition-colors shadow-sm text-sm font-medium"
+                  >
+                    <Plus size={18} /> Nuevo
+                  </button>
+             </>
             )}
         </div>
       </div>
@@ -456,7 +545,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
           </div>
         </div>
 
-        {/* Collapsible Filters Panel */}
+        {/* Collapsible Filters */}
         {showFilters && (
             <div className="p-4 bg-slate-50 border-b border-slate-200 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 animate-in slide-in-from-top-2 duration-200">
                 <div>
@@ -574,28 +663,21 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                                 <RefreshCw size={16} />
                             </button>
                         )}
-                        {canEditProduct && (
-                          <>
+                        {canEdit && (
                             <button onClick={() => openModal(product)} className="p-1 hover:bg-slate-200 rounded text-slate-600">
                               <Edit size={16} />
                             </button>
+                        )}
+                        {canDelete && (
                             <button onClick={() => handleDelete(product.id)} className="p-1 hover:bg-red-50 rounded text-red-500">
                               <Trash2 size={16} />
                             </button>
-                          </>
                         )}
                       </div>
                     </td>
                   </tr>
                 );
               })}
-              {filteredProducts.length === 0 && (
-                <tr>
-                  <td colSpan={6} className="px-6 py-8 text-center text-slate-400">
-                    No se encontraron productos con los filtros actuales.
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
@@ -605,7 +687,6 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {filteredProducts.map(product => (
                         <div key={product.id} className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden hover:shadow-md transition-all group flex flex-col">
-                            {/* Product Image */}
                             <div className="h-48 bg-slate-100 flex items-center justify-center relative overflow-hidden">
                                 {product.image ? (
                                     <img src={product.image} alt={product.name} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -624,8 +705,6 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                             
                             <div className="p-4 flex-1 flex flex-col">
                                 <h3 className="font-bold text-lg text-slate-800 leading-tight mb-1">{product.name}</h3>
-                                <p className="text-xs text-slate-500 mb-3 line-clamp-2">{product.description || 'Sin descripción'}</p>
-                                
                                 <div className="flex items-center gap-2 mb-4">
                                     <span className="text-xs bg-slate-100 px-2 py-1 rounded text-slate-600 font-medium border border-slate-200">
                                         {product.measurementValue} {product.measurementUnit}
@@ -634,14 +713,12 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                                         Stock: {product.stock}
                                     </span>
                                 </div>
-
                                 <div className="mt-auto flex justify-between items-center pt-3 border-t border-slate-100">
                                     <div className="text-xl font-bold text-slate-900">
                                         ${product.price.toFixed(2)}
                                     </div>
                                     <button 
                                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
-                                        title="Compartir Producto"
                                         onClick={() => {
                                             if (navigator.share) {
                                                 navigator.share({
@@ -658,8 +735,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                                     </button>
                                 </div>
                             </div>
-                            {/* Admin Quick Actions for Catalog */}
-                            {canEditProduct && (
+                            {canEdit && (
                                 <div className="bg-slate-50 p-2 border-t border-slate-100 flex justify-between text-xs text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity">
                                     <span>Costo: ${product.cost.toFixed(2)}</span>
                                     <button onClick={() => openModal(product)} className="hover:text-blue-600 font-medium">Editar</button>
@@ -673,7 +749,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
       </div>
 
       {/* MODAL: PRODUCT FORM */}
-      {isModalOpen && canEditProduct && (
+      {isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
             <form onSubmit={handleSubmit} className="p-6">
@@ -886,8 +962,8 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
         </div>
       )}
 
-      {/* MODAL: STOCK ENTRY/EXIT (REPLENISH OR ADJUST) */}
-      {isStockModalOpen && stockProduct && canManageStock && (
+      {/* MODAL: STOCK ENTRY/EXIT */}
+      {isStockModalOpen && stockProduct && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
             <h3 className="text-xl font-bold mb-4 text-slate-800 flex items-center gap-2">
@@ -898,8 +974,6 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                 Stock Actual: {stockProduct.stock}
             </p>
             <form onSubmit={handleStockUpdate} className="space-y-4">
-              
-              {/* Toggle for Entry/Exit */}
               <div className="flex bg-slate-100 p-1 rounded-lg">
                   <button 
                     type="button"
@@ -962,7 +1036,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                     <Archive size={24}/> Sugerencia de Compra (OC)
                 </h3>
                 <button onClick={() => setShowOrderPreview(false)} className="text-slate-400 hover:text-slate-600">
-                    <Edit size={20} className="rotate-45" /> {/* Close icon visual hack */}
+                    <Edit size={20} className="rotate-45" />
                 </button>
             </div>
             
@@ -976,7 +1050,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                             <th className="p-2">Producto</th>
                             <th className="p-2">Stock Actual</th>
                             <th className="p-2">Mínimo</th>
-                            <th className="p-2">Sugerido</th>
+                            <th className="p-2">Sugerido (Min+5)</th>
                             <th className="p-2">Proveedor</th>
                         </tr>
                     </thead>

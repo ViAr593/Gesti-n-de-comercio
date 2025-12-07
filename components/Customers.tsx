@@ -1,14 +1,16 @@
 
 import React, { useState } from 'react';
-import { Customer } from '../types';
+import { Customer, Employee } from '../types';
 import { Plus, Edit, Trash2, User, Phone, Mail, MapPin, FileText, Smartphone, Contact } from 'lucide-react';
+import { hasPermission } from '../services/rbac';
 
 interface CustomersProps {
   customers: Customer[];
   setCustomers: (customers: Customer[]) => void;
+  currentUser: Employee | null;
 }
 
-export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers }) => {
+export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers, currentUser }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formData, setFormData] = useState<Omit<Customer, 'id'>>({
@@ -19,17 +21,24 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
     address: ''
   });
 
+  const canCreate = hasPermission(currentUser, 'CUSTOMERS', 'create');
+  const canEdit = hasPermission(currentUser, 'CUSTOMERS', 'edit');
+  const canDelete = hasPermission(currentUser, 'CUSTOMERS', 'delete');
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingId) {
+      if (!canEdit) return;
       setCustomers(customers.map(c => c.id === editingId ? { ...formData, id: editingId } : c));
     } else {
+      if (!canCreate) return;
       setCustomers([...customers, { ...formData, id: crypto.randomUUID() }]);
     }
     closeModal();
   };
 
   const handleDelete = (id: string) => {
+    if (!canDelete) return;
     if (confirm('¿Eliminar cliente?')) {
       setCustomers(customers.filter(c => c.id !== id));
     }
@@ -37,6 +46,7 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
 
   const openModal = (customer?: Customer) => {
     if (customer) {
+      if (!canEdit) return;
       setEditingId(customer.id);
       setFormData({
         name: customer.name,
@@ -46,6 +56,7 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
         address: customer.address
       });
     } else {
+      if (!canCreate) return;
       setEditingId(null);
       setFormData({ name: '', taxId: '', email: '', phone: '', address: '' });
     }
@@ -58,14 +69,11 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
   };
 
   const handleImportContact = async () => {
-    // Feature detection for Mobile Contacts API
-    // Note: This only works in secure contexts (HTTPS) and supported mobile browsers (Chrome Android, iOS Safari 14.5+)
     if ('contacts' in navigator && 'ContactsManager' in window) {
       try {
         const props = ['name', 'tel', 'email'];
         const opts = { multiple: false };
-        
-        // @ts-ignore - The contacts API is experimental in some TS libs
+        // @ts-ignore 
         const contacts = await navigator.contacts.select(props, opts);
         
         if (contacts && contacts.length > 0) {
@@ -78,7 +86,6 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
           }));
         }
       } catch (ex) {
-        // User cancelled or error
         console.log(ex);
       }
     } else {
@@ -93,12 +100,14 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
           <h2 className="text-2xl font-bold text-slate-800">Clientes</h2>
           <p className="text-slate-500 text-sm">Base de datos de compradores frecuentes</p>
         </div>
-        <button 
-          onClick={() => openModal()}
-          className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
-        >
-          <Plus size={18} /> Agregar Cliente
-        </button>
+        {canCreate && (
+          <button 
+            onClick={() => openModal()}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors shadow-sm"
+          >
+            <Plus size={18} /> Agregar Cliente
+          </button>
+        )}
       </div>
 
       <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -148,24 +157,20 @@ export const Customers: React.FC<CustomersProps> = ({ customers, setCustomers })
                   </td>
                   <td className="px-6 py-4 text-right">
                     <div className="flex justify-end gap-2">
-                      <button onClick={() => openModal(customer)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500">
-                        <Edit size={16} />
-                      </button>
-                      <button onClick={() => handleDelete(customer.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500">
-                        <Trash2 size={16} />
-                      </button>
+                      {canEdit && (
+                        <button onClick={() => openModal(customer)} className="p-1.5 hover:bg-slate-200 rounded text-slate-500">
+                            <Edit size={16} />
+                        </button>
+                      )}
+                      {canDelete && (
+                        <button onClick={() => handleDelete(customer.id)} className="p-1.5 hover:bg-red-50 rounded text-red-500">
+                            <Trash2 size={16} />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
-              {customers.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-6 py-12 text-center text-slate-400">
-                    <User className="mx-auto h-12 w-12 text-slate-300 mb-2" />
-                    <p>No hay clientes registrados.</p>
-                  </td>
-                </tr>
-              )}
             </tbody>
           </table>
         </div>
