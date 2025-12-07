@@ -2,7 +2,7 @@
 
 import React, { useState, useRef } from 'react';
 import { BusinessConfig, OpeningHours, DaySchedule } from '../types';
-import { Save, Building2, Receipt, Image as ImageIcon, Check, Moon, Sun, Database, Download, Upload, AlertTriangle, Clock, MessageCircle } from 'lucide-react';
+import { Save, Building2, Receipt, Image as ImageIcon, Check, Moon, Sun, Database, Download, Upload, AlertTriangle, Clock, MessageCircle, Globe } from 'lucide-react';
 import { db } from '../services/db';
 
 interface SettingsProps {
@@ -37,6 +37,13 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
     const updatedConfig = { ...formData, theme };
     setFormData(updatedConfig);
     setConfig(updatedConfig); // Apply theme immediately
+    setSaved(false);
+  };
+
+  const handleLanguageChange = (language: 'es' | 'en') => {
+    const updatedConfig = { ...formData, language };
+    setFormData(updatedConfig);
+    setConfig(updatedConfig); // Apply immediately
     setSaved(false);
   };
 
@@ -183,6 +190,40 @@ export const Settings: React.FC<SettingsProps> = ({ config, setConfig }) => {
                             <Moon size={16} />
                         </div>
                         <span className="font-medium">Modo Oscuro</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        {/* CARD 0.5: Language */}
+        <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="p-4 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 flex items-center gap-2">
+                <Globe className="text-slate-500" size={20} />
+                <h3 className="font-bold text-slate-700 dark:text-slate-200">Idioma / Language</h3>
+            </div>
+            <div className="p-6">
+                <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">Selecciona el idioma de la aplicación / Select application language.</p>
+                <div className="grid grid-cols-2 gap-4 max-w-md">
+                    <button
+                        type="button"
+                        onClick={() => handleLanguageChange('es')}
+                        className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${formData.language === 'es' ? 'border-emerald-500 bg-emerald-50 dark:bg-slate-700 text-slate-900 dark:text-white' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 text-slate-500'}`}
+                    >
+                        <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-emerald-500 font-bold text-xs">
+                            ES
+                        </div>
+                        <span className="font-medium">Español</span>
+                    </button>
+
+                    <button
+                        type="button"
+                        onClick={() => handleLanguageChange('en')}
+                        className={`p-4 rounded-xl border-2 flex items-center gap-3 transition-all ${formData.language === 'en' ? 'border-indigo-500 bg-indigo-50 dark:bg-slate-700 text-slate-900 dark:text-white' : 'border-slate-200 dark:border-slate-600 hover:border-slate-300 text-slate-500'}`}
+                    >
+                        <div className="w-8 h-8 rounded-full bg-white border border-slate-200 flex items-center justify-center text-indigo-500 font-bold text-xs">
+                            EN
+                        </div>
+                        <span className="font-medium">English</span>
                     </button>
                 </div>
             </div>

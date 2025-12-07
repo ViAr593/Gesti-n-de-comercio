@@ -100,6 +100,7 @@ export interface BusinessConfig {
   currencySymbol: string;
   logo?: string; // Base64 string
   theme?: 'light' | 'dark';
+  language?: 'es' | 'en'; // Language preference
   openingHours?: OpeningHours;
   whatsapp?: string; // New field for WhatsApp Order Store
 }

@@ -106,6 +106,7 @@ const SEED_DATA = {
     receiptMessage: '¡Gracias por su compra!',
     currencySymbol: '$',
     theme: 'light',
+    language: 'es',
     openingHours: {
         monday: { isOpen: true, open: '09:00', close: '18:00' },
         tuesday: { isOpen: true, open: '09:00', close: '18:00' },
@@ -184,6 +185,7 @@ export const db = {
         // Ensure structure for existing users without openingHours or whatsapp
         if (!config.openingHours) config.openingHours = SEED_DATA.config.openingHours;
         if (config.whatsapp === undefined) config.whatsapp = '';
+        if (config.language === undefined) config.language = 'es';
         return config;
     },
     set: (data: BusinessConfig) => save(KEYS.CONFIG, data),

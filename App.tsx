@@ -51,14 +51,17 @@ const App: React.FC = () => {
   useEffect(() => { db.config.set(businessConfig); }, [businessConfig]);
   useEffect(() => { db.logs.set(inventoryLogs); }, [inventoryLogs]);
 
-  // -- APPLY THEME --
+  // -- APPLY THEME & LANGUAGE --
   useEffect(() => {
+    // Theme
     if (businessConfig.theme === 'dark') {
         document.documentElement.classList.add('dark');
     } else {
         document.documentElement.classList.remove('dark');
     }
-  }, [businessConfig.theme]);
+    // Language
+    document.documentElement.lang = businessConfig.language || 'es';
+  }, [businessConfig.theme, businessConfig.language]);
 
   // -- SECURITY: AUTO LOCK LOGIC --
   const resetInactivityTimer = () => {
