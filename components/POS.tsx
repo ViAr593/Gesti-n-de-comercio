@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product, CartItem, Sale, Customer, Expense, Quotation, BusinessConfig } from '../types';
-import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown, FileText, Download } from 'lucide-react';
+import { Search, ShoppingCart, Trash2, Plus, Minus, CreditCard, Banknote, Smartphone, Printer, X, User, CheckCircle, Edit, Tag, Wallet, RefreshCw, ChevronUp, ChevronDown, FileText, Download, Check } from 'lucide-react';
 
 interface POSProps {
   products: Product[];
@@ -110,6 +110,10 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
 
   const handleCheckout = () => {
     if (cart.length === 0) return;
+    if (!paymentMethod) {
+        alert("Seleccione un método de pago.");
+        return;
+    }
     const sale: Sale = {
       id: crypto.randomUUID(),
       date: new Date().toISOString(),
@@ -496,20 +500,23 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             <div className="grid grid-cols-3 gap-2">
               <button 
                 onClick={() => setPaymentMethod('EFECTIVO')}
-                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 text-xs transition-all ${paymentMethod === 'EFECTIVO' ? 'bg-amber-50 border-amber-500 text-amber-800 font-bold' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 text-xs transition-all relative ${paymentMethod === 'EFECTIVO' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
               >
+                {paymentMethod === 'EFECTIVO' && <Check size={14} className="absolute top-1 right-1 text-emerald-600"/>}
                 <Banknote size={18} /> Efectivo
               </button>
               <button 
                 onClick={() => setPaymentMethod('TARJETA')}
-                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 text-xs transition-all ${paymentMethod === 'TARJETA' ? 'bg-amber-50 border-amber-500 text-amber-800 font-bold' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 text-xs transition-all relative ${paymentMethod === 'TARJETA' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
               >
+                {paymentMethod === 'TARJETA' && <Check size={14} className="absolute top-1 right-1 text-emerald-600"/>}
                 <CreditCard size={18} /> Tarjeta
               </button>
               <button 
                 onClick={() => setPaymentMethod('TRANSFERENCIA')}
-                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 text-xs transition-all ${paymentMethod === 'TRANSFERENCIA' ? 'bg-amber-50 border-amber-500 text-amber-800 font-bold' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+                className={`p-2 rounded-lg border text-center flex flex-col items-center gap-1 text-xs transition-all relative ${paymentMethod === 'TRANSFERENCIA' ? 'bg-emerald-50 border-emerald-500 text-emerald-800 font-bold shadow-sm' : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50'}`}
               >
+                {paymentMethod === 'TRANSFERENCIA' && <Check size={14} className="absolute top-1 right-1 text-emerald-600"/>}
                 <Smartphone size={18} /> Transf.
               </button>
             </div>
@@ -531,10 +538,10 @@ export const POS: React.FC<POSProps> = ({ products, customers = [], onCompleteSa
             </button>
             <button 
                 onClick={handleCheckout}
-                disabled={cart.length === 0}
-                className="flex-[2] bg-slate-900 hover:bg-slate-800 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-slate-900/10 transition-all flex justify-center items-center gap-2"
+                disabled={cart.length === 0 || !paymentMethod}
+                className="flex-[2] bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white py-3.5 rounded-xl font-bold text-lg shadow-lg shadow-emerald-900/20 transition-all flex justify-center items-center gap-2"
             >
-                Emitir Nota
+                <Check size={20} /> Emitir Nota
             </button>
           </div>
         </div>

@@ -1,9 +1,4 @@
-
-
-
-
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Product, Sale, Supplier, Expense, ViewState, Customer, Employee, Quotation, BusinessConfig, InventoryLog } from './types';
 import { Sidebar } from './components/Sidebar';
 import { Dashboard } from './components/Dashboard';
@@ -17,13 +12,16 @@ import { Employees } from './components/Employees';
 import { Tools } from './components/Tools';
 import { Settings } from './components/Settings'; 
 import { Login } from './components/Login';
-import { Menu } from 'lucide-react';
+import { Menu, Lock } from 'lucide-react';
 import { db } from './services/db'; 
+
+const INACTIVITY_LIMIT_MS = 5 * 60 * 1000; // 5 minutos
 
 const App: React.FC = () => {
   const [currentUser, setCurrentUser] = useState<Employee | null>(null);
   const [currentView, setCurrentView] = useState<ViewState>('DASHBOARD');
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showLockScreen, setShowLockScreen] = useState(false);
 
   // -- INITIALIZE STATE FROM DB SERVICE --
   const [products, setProducts] = useState<Product[]>(() => db.products.getAll());
@@ -35,6 +33,9 @@ const App: React.FC = () => {
   const [quotations, setQuotations] = useState<Quotation[]>(() => db.quotations.getAll());
   const [businessConfig, setBusinessConfig] = useState<BusinessConfig>(() => db.config.get());
   const [inventoryLogs, setInventoryLogs] = useState<InventoryLog[]>(() => db.logs.getAll());
+
+  // -- INACTIVITY TIMER REF --
+  const inactivityTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // -- PERSIST CHANGES TO DB SERVICE --
   useEffect(() => { db.products.set(products); }, [products]);
@@ -55,6 +56,40 @@ const App: React.FC = () => {
         document.documentElement.classList.remove('dark');
     }
   }, [businessConfig.theme]);
+
+  // -- SECURITY: AUTO LOCK LOGIC --
+  const resetInactivityTimer = () => {
+    if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+    
+    if (currentUser && !showLockScreen) {
+        inactivityTimer.current = setTimeout(() => {
+            handleLockSession();
+        }, INACTIVITY_LIMIT_MS);
+    }
+  };
+
+  const handleLockSession = () => {
+    setShowLockScreen(true);
+    // Optional: setCurrentUser(null) if you want full logout instead of just lock screen
+  };
+
+  useEffect(() => {
+    // Events to detect activity
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    
+    const handleActivity = () => resetInactivityTimer();
+
+    if (currentUser && !showLockScreen) {
+        resetInactivityTimer(); // Start timer
+        events.forEach(event => document.addEventListener(event, handleActivity));
+    }
+
+    return () => {
+        if (inactivityTimer.current) clearTimeout(inactivityTimer.current);
+        events.forEach(event => document.removeEventListener(event, handleActivity));
+    };
+  }, [currentUser, showLockScreen]);
+
 
   // -- BUSINESS LOGIC --
   const handleCompleteSale = (newSale: Sale) => {
@@ -130,8 +165,23 @@ const App: React.FC = () => {
     }
   };
 
-  if (!currentUser) {
-    return <Login onLoginSuccess={(user) => setCurrentUser(user)} />;
+  // -- RENDER: LOCK SCREEN OR LOGIN --
+  if (!currentUser || showLockScreen) {
+    return (
+        <div className="relative">
+            {showLockScreen && currentUser && (
+                <div className="absolute top-4 right-4 z-50 text-white font-mono text-xs bg-black/50 px-2 py-1 rounded">
+                    Sesión bloqueada por inactividad
+                </div>
+            )}
+            <Login 
+                onLoginSuccess={(user) => {
+                    setCurrentUser(user);
+                    setShowLockScreen(false);
+                }} 
+            />
+        </div>
+    );
   }
 
   return (
@@ -159,10 +209,31 @@ const App: React.FC = () => {
             setView={(v) => { setCurrentView(v); setMobileMenuOpen(false); }} 
             businessConfig={businessConfig}
         />
+        {/* Manual Lock Button in Sidebar area (or accessible via Sidebar component if prop passed, but here we place it via context if needed, or just let auto-lock handle it. 
+           Ideally Sidebar should have a Logout button. Let's add a logout/lock capability by passing a prop or just rely on auto-lock for now to keep changes minimal to App.tsx)
+        */}
+        <div className="absolute bottom-4 left-4 z-50 md:hidden">
+             {/* Mobile Lock Button Placeholder if needed */}
+        </div>
       </div>
 
       {/* Main Content Area */}
       <main className="flex-1 overflow-y-auto md:ml-64 pt-16 md:pt-0 h-full w-full relative custom-scrollbar">
+        {/* Top Bar for Desktop User Profile / Manual Lock */}
+        <div className="hidden md:flex absolute top-4 right-4 z-30 gap-3">
+             <div className="bg-white dark:bg-slate-800 px-3 py-1.5 rounded-full shadow-sm border border-slate-200 dark:border-slate-700 flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+                {currentUser.name} ({currentUser.role})
+             </div>
+             <button 
+                onClick={handleLockSession}
+                className="bg-slate-800 text-white p-1.5 rounded-full hover:bg-slate-700 transition-colors shadow-sm"
+                title="Bloquear Sesión"
+             >
+                <Lock size={16} />
+             </button>
+        </div>
+
         {renderView()}
       </main>
 

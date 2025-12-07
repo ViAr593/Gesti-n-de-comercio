@@ -31,6 +31,7 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const [filterSupplier, setFilterSupplier] = useState('');
   const [filterStock, setFilterStock] = useState<'ALL' | 'LOW' | 'MEDIUM' | 'HIGH'>('ALL');
 
+  // -- FORM STATES --
   const [isGenerating, setIsGenerating] = useState(false);
 
   // Role Checks
@@ -78,6 +79,17 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      // Validate file type
+      if (!file.type.startsWith('image/')) {
+        alert('Por favor, seleccione un archivo de imagen válido.');
+        return;
+      }
+      // Validate file size (max 2MB)
+      if (file.size > 2 * 1024 * 1024) {
+        alert('La imagen es demasiado grande. El tamaño máximo permitido es 2MB.');
+        return;
+      }
+
       const reader = new FileReader();
       reader.onloadend = () => {
         setFormData(prev => ({ ...prev, image: reader.result as string }));
@@ -337,14 +349,15 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
           <h2 className="text-2xl font-bold text-slate-800">Inventario</h2>
           <p className="text-slate-500 text-sm">Gestiona tus productos, costos y catálogo</p>
         </div>
-        <div className="flex gap-2 w-full md:w-auto">
+        <div className="flex gap-2 w-full md:w-auto flex-wrap">
             {isManager && (
                 <button 
                     onClick={() => setShowAuditLog(true)}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-lg transition-colors border border-slate-200"
-                    title="Ver Auditoría"
+                    className="bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg transition-colors flex items-center gap-2"
+                    title="Ver Registro de Auditoría"
                 >
                     <ClipboardList size={18} />
+                    <span className="hidden sm:inline text-sm font-medium">Auditoría</span>
                 </button>
             )}
             <button 
@@ -629,7 +642,17 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                                     <button 
                                         className="p-2 text-blue-600 hover:bg-blue-50 rounded-full transition-colors"
                                         title="Compartir Producto"
-                                        onClick={() => alert(`Compartir: ${product.name} - $${product.price}`)}
+                                        onClick={() => {
+                                            if (navigator.share) {
+                                                navigator.share({
+                                                    title: product.name,
+                                                    text: `${product.name} - $${product.price.toFixed(2)}`,
+                                                    url: window.location.href
+                                                }).catch(() => {});
+                                            } else {
+                                                alert(`Simulación de compartir:\n${product.name}\nPrecio: $${product.price.toFixed(2)}`);
+                                            }
+                                        }}
                                     >
                                         <Share2 size={20} />
                                     </button>
@@ -678,7 +701,10 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                         ) : (
                             <div className="absolute inset-0 flex flex-col items-center justify-center text-slate-400 pointer-events-none">
                                 <Upload size={32} className="mb-2"/>
-                                <span className="text-xs text-center px-4">Click para subir imagen</span>
+                                <span className="text-xs text-center px-4 text-slate-500">
+                                  Click para subir imagen
+                                  <span className="block text-[10px] text-slate-400 mt-1">(Max 2MB)</span>
+                                </span>
                             </div>
                         )}
                         <input 
@@ -736,13 +762,22 @@ export const Inventory: React.FC<InventoryProps> = ({ products, suppliers, setPr
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Categoría</label>
-                        <input 
-                        required
-                        type="text" 
-                        value={formData.category}
-                        onChange={e => setFormData({...formData, category: e.target.value})}
-                        className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none"
-                        />
+                        <div className="relative">
+                            <input 
+                                required
+                                list="categories-list"
+                                type="text" 
+                                value={formData.category}
+                                onChange={e => setFormData({...formData, category: e.target.value})}
+                                className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-white"
+                                placeholder="Escribe para buscar o crear..."
+                            />
+                            <datalist id="categories-list">
+                                {uniqueCategories.map(cat => (
+                                    <option key={cat} value={cat} />
+                                ))}
+                            </datalist>
+                        </div>
                     </div>
                      <div>
                         <label className="block text-sm font-medium text-slate-700 mb-1">Proveedor</label>
