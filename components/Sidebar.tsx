@@ -1,42 +1,41 @@
-
-
 import React from 'react';
 import { LayoutDashboard, Package, ShoppingCart, Users, History, Store, Wallet, UserCircle, Briefcase, Wrench, Settings, ShoppingBag } from 'lucide-react';
 import { ViewState, BusinessConfig, Employee } from '../types';
 import { hasPermission, ModuleScope } from '../services/rbac';
+import { t, Language } from '../services/translations';
 
 interface SidebarProps {
   currentView: ViewState;
   setView: (view: ViewState) => void;
   businessConfig?: BusinessConfig;
   currentUser: Employee | null;
+  lang?: Language;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, businessConfig, currentUser }) => {
+export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, businessConfig, currentUser, lang = 'es' }) => {
   
   // Mapping ViewState to ModuleScope for permission checking
   const getModuleFromView = (view: string): ModuleScope => {
-    if (view === 'DASHBOARD') return 'SALES_HISTORY'; // Dashboard visible for almost everyone who can see history/pos
+    if (view === 'DASHBOARD') return 'SALES_HISTORY'; 
     return view as ModuleScope;
   };
 
   const menuItems = [
-    { id: 'DASHBOARD', label: 'Balance', icon: LayoutDashboard, module: 'SALES_HISTORY' }, // General dashboard access
-    { id: 'POS', label: 'Vender (POS)', icon: ShoppingCart, module: 'POS' },
-    { id: 'STORE', label: 'Catálogo Digital', icon: ShoppingBag, module: 'STORE' }, // New WhatsApp Store
-    { id: 'INVENTORY', label: 'Inventario', icon: Package, module: 'INVENTORY' },
-    { id: 'EXPENSES', label: 'Gastos', icon: Wallet, module: 'EXPENSES' },
-    { id: 'CUSTOMERS', label: 'Clientes', icon: UserCircle, module: 'CUSTOMERS' },
-    { id: 'SUPPLIERS', label: 'Proveedores', icon: Store, module: 'SUPPLIERS' },
-    { id: 'EMPLOYEES', label: 'Empleados', icon: Briefcase, module: 'EMPLOYEES' },
-    { id: 'TOOLS', label: 'Herramientas', icon: Wrench, module: 'TOOLS' },
-    { id: 'SALES_HISTORY', label: 'Movimientos', icon: History, module: 'SALES_HISTORY' },
-    { id: 'SETTINGS', label: 'Configuración', icon: Settings, module: 'SETTINGS' },
+    { id: 'DASHBOARD', label: t('menu_dashboard', lang), icon: LayoutDashboard, module: 'SALES_HISTORY' },
+    { id: 'POS', label: t('menu_pos', lang), icon: ShoppingCart, module: 'POS' },
+    { id: 'STORE', label: t('menu_store', lang), icon: ShoppingBag, module: 'STORE' },
+    { id: 'INVENTORY', label: t('menu_inventory', lang), icon: Package, module: 'INVENTORY' },
+    { id: 'EXPENSES', label: t('menu_expenses', lang), icon: Wallet, module: 'EXPENSES' },
+    { id: 'CUSTOMERS', label: t('menu_customers', lang), icon: UserCircle, module: 'CUSTOMERS' },
+    { id: 'SUPPLIERS', label: t('menu_suppliers', lang), icon: Store, module: 'SUPPLIERS' },
+    { id: 'EMPLOYEES', label: t('menu_employees', lang), icon: Briefcase, module: 'EMPLOYEES' },
+    { id: 'TOOLS', label: t('menu_tools', lang), icon: Wrench, module: 'TOOLS' },
+    { id: 'SALES_HISTORY', label: t('menu_history', lang), icon: History, module: 'SALES_HISTORY' },
+    { id: 'SETTINGS', label: t('menu_settings', lang), icon: Settings, module: 'SETTINGS' },
   ];
 
   // Filter items based on permissions
   const visibleItems = menuItems.filter(item => {
-    // Special case for Dashboard: if user has access to POS or INVENTORY, they likely should see Dashboard/Home
     if (item.id === 'DASHBOARD') return true; 
     return hasPermission(currentUser, item.module as ModuleScope, 'view');
   });
@@ -75,18 +74,18 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, business
       </nav>
 
       <div className="p-4 border-t border-slate-100 bg-slate-50">
-        <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
             {businessConfig?.logo ? (
                 <img src={businessConfig.logo} alt="Logo" className="w-full h-full object-cover"/>
             ) : (
                 "GP"
             )}
           </div>
-          <div className="overflow-hidden flex-1">
+          <div className="overflow-hidden flex-1 min-w-0">
             <p className="text-sm font-semibold text-slate-700 truncate">{businessConfig?.name || 'Mi Negocio'}</p>
             <p className="text-xs text-slate-500 truncate">
-               {currentUser?.role === 'GERENTE_GENERAL' ? 'Plan Premium' : currentUser?.role.replace('_', ' ')}
+               {currentUser?.role === 'GERENTE_GENERAL' ? 'Gerente' : currentUser?.role.replace('_', ' ')}
             </p>
           </div>
         </div>

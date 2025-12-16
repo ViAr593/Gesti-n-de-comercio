@@ -195,47 +195,11 @@ export const db = {
     set: (data: InventoryLog[]) => save(KEYS.LOGS, data),
   },
   auth: {
-    // Validate credentials against the database securely
-    login: async (email: string, pass: string): Promise<Employee | null> => {
-      // 1. Hash the input password to compare with stored hash
-      const hashedInput = await hashPassword(pass);
-
-      // 2. Load stored employees
-      const employees = load<Employee[]>(KEYS.EMPLOYEES, SEED_DATA.employees);
-      
-      // 3. Find user by email
-      let user = employees.find(e => e.email === email);
-      
-      // Fallback: If no user found in local DB (e.g., cleared), but using default admin, use SEED data
-      if (!user && email === 'admin@sistema.com') {
-         // Check if the hash matches the seed admin hash
-         const seedAdmin = SEED_DATA.employees.find(e => e.email === 'admin@sistema.com');
-         if (seedAdmin && seedAdmin.password === hashedInput) {
-             return seedAdmin;
-         }
-      }
-
-      if (user) {
-        // Path A: The password in DB matches the hashed input (Secure, normal path)
-        if (user.password === hashedInput) {
-            return user;
-        }
-
-        // Path B (MIGRATION): The password in DB is legacy PLAIN TEXT and matches input
-        // This allows existing users to login, and we immediately upgrade them to hash
-        if (user.password === pass) {
-            console.log("Migrating legacy plain-text password to hash for user:", email);
-            user.password = hashedInput;
-            
-            // Save updated employee list to storage
-            const updatedEmployees = employees.map(e => e.id === user!.id ? user! : e);
-            save(KEYS.EMPLOYEES, updatedEmployees);
-            
-            return user;
-        }
-      }
-
-      return null;
+    login: async (email: string, password: string): Promise<Employee | null> => {
+        const employees = load<Employee[]>(KEYS.EMPLOYEES, SEED_DATA.employees);
+        const hash = await hashPassword(password);
+        const user = employees.find(u => u.email.toLowerCase() === email.toLowerCase() && u.password === hash);
+        return user || null;
     }
   }
 };
