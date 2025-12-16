@@ -14,6 +14,7 @@ import { Settings } from './components/Settings';
 import { WhatsAppStore } from './components/WhatsAppStore';
 import { Menu } from 'lucide-react';
 import { db } from './services/db'; 
+import { t } from './services/translations';
 
 const App: React.FC = () => {
   // USUARIO POR DEFECTO (Autenticación Deshabilitada)
@@ -138,7 +139,16 @@ const App: React.FC = () => {
       case 'EMPLOYEES':
         return <Employees employees={employees} setEmployees={setEmployees} currentUser={currentUser} />;
       case 'TOOLS':
-        return <Tools products={products} />;
+        return <Tools 
+            products={products} 
+            suppliers={suppliers}
+            customers={customers}
+            employees={employees}
+            sales={sales}
+            expenses={expenses}
+            quotations={quotations}
+            inventoryLogs={inventoryLogs}
+        />;
       case 'SETTINGS':
         return <Settings config={businessConfig} setConfig={setBusinessConfig} lang={currentLang} />;
       default:
