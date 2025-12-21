@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
 import { Sale, Product, Expense } from '../types';
-import { DollarSign, TrendingUp, TrendingDown, Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight, X, Clock, User } from 'lucide-react';
+import { DollarSign, TrendingUp, TrendingDown, Calendar, Sparkles, Loader2, ChevronLeft, ChevronRight, X, Clock, User, PieChart as PieIcon } from 'lucide-react';
 import { analyzeSalesTrends } from '../services/gemini';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, PieChart, Pie, Cell } from 'recharts';
 import { t, Language } from '../services/translations';
 
 interface DashboardProps {
@@ -14,6 +14,8 @@ interface DashboardProps {
 
 type DateRange = 'today' | 'week' | 'month';
 
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4'];
+
 export const Dashboard: React.FC<DashboardProps> = ({ sales, expenses, products, lang = 'es' }) => {
   const [aiAnalysis, setAiAnalysis] = useState<string>('');
   const [analyzing, setAnalyzing] = useState(false);
@@ -24,11 +26,12 @@ export const Dashboard: React.FC<DashboardProps> = ({ sales, expenses, products,
   const [selectedDayDetails, setSelectedDayDetails] = useState<{date: Date, sales: Sale[], total: number} | null>(null);
 
   // --- DATA PROCESSING LOGIC ---
-  const { filteredSales, filteredExpenses, totalRevenue, totalExpenses, netProfit, chartData } = useMemo(() => {
+  const { filteredSales, filteredExpenses, totalRevenue, totalExpenses, netProfit, chartData, categoryData } = useMemo(() => {
     const now = new Date();
     let fSales: Sale[] = [];
     let fExpenses: Expense[] = [];
     let cData: any[] = [];
+    const categoryMap = new Map<string, number>();
 
     if (dateRange === 'today') {
       const todayStr = now.toDateString();
@@ -124,6 +127,19 @@ export const Dashboard: React.FC<DashboardProps> = ({ sales, expenses, products,
       }));
     }
 
+    // Category calculation
+    fSales.forEach(s => {
+        s.items.forEach(item => {
+            const cat = item.category || 'General';
+            const value = (item.price - (item.discount || 0)) * item.quantity;
+            categoryMap.set(cat, (categoryMap.get(cat) || 0) + value);
+        });
+    });
+
+    const catData = Array.from(categoryMap.entries())
+        .map(([name, value]) => ({ name, value }))
+        .sort((a, b) => b.value - a.value);
+
     const tRevenue = fSales.reduce((acc, s) => acc + s.total, 0);
     const tExpenses = fExpenses.reduce((acc, e) => acc + e.amount, 0);
     const nProfit = tRevenue - tExpenses;
@@ -134,22 +150,13 @@ export const Dashboard: React.FC<DashboardProps> = ({ sales, expenses, products,
         totalRevenue: tRevenue,
         totalExpenses: tExpenses,
         netProfit: nProfit,
-        chartData: cData
+        chartData: cData,
+        categoryData: catData
     };
   }, [sales, expenses, dateRange, lang]);
 
   const handleAnalyze = async () => {
     setAnalyzing(true);
-    // Simple summary for AI
-    const summary = {
-        period: dateRange,
-        sales: totalRevenue,
-        expenses: totalExpenses,
-        profit: netProfit,
-        salesCount: filteredSales.length,
-        topProducts: products.sort((a,b) => b.stock - a.stock).slice(0, 3).map(p => p.name)
-    };
-    // Note: The prompt is still in Spanish in the service for now, but results display here.
     const result = await analyzeSalesTrends(sales, products); 
     setAiAnalysis(result);
     setAnalyzing(false);
@@ -316,6 +323,65 @@ export const Dashboard: React.FC<DashboardProps> = ({ sales, expenses, products,
           </ResponsiveContainer>
         </div>
 
+        <div className="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 min-h-[400px]">
+            <h3 className="font-bold text-slate-700 dark:text-white mb-6 flex items-center gap-2">
+                <PieIcon className="w-4 h-4 text-slate-400" />
+                {t('dash_category_title', lang)}
+            </h3>
+            <ResponsiveContainer width="100%" height={320}>
+                <PieChart>
+                    <Pie
+                        data={categoryData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        paddingAngle={5}
+                        dataKey="value"
+                    >
+                        {categoryData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                        ))}
+                    </Pie>
+                    <Tooltip 
+                        contentStyle={{borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}}
+                        formatter={(value: number) => [`$${value.toFixed(2)}`, lang === 'es' ? 'Ventas' : 'Sales']}
+                    />
+                    <Legend />
+                </PieChart>
+            </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
+            <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
+                <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
+                    <Calendar className="text-blue-600" size={20}/> {t('dash_calendar', lang)}
+                </h3>
+                <div className="flex items-center gap-4">
+                    <span className="text-slate-900 dark:text-white font-bold capitalize w-32 text-center">
+                        {lang === 'es' ? monthNames[currentMonth.getMonth()] : monthNamesEn[currentMonth.getMonth()]} {currentMonth.getFullYear()}
+                    </span>
+                    <div className="flex gap-1">
+                        <button onClick={prevMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"><ChevronLeft size={20}/></button>
+                        <button onClick={nextMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"><ChevronRight size={20}/></button>
+                    </div>
+                </div>
+            </div>
+            
+            <div className="p-6">
+                <div className="grid grid-cols-7 gap-px mb-2 text-center">
+                    {(lang === 'es' ? dayNames : dayNamesEn).map(d => (
+                        <div key={d} className="text-xs font-bold text-slate-400 uppercase pb-2">{d}</div>
+                    ))}
+                </div>
+                <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                    {renderCalendar()}
+                </div>
+            </div>
+        </div>
+
         <div className="bg-gradient-to-br from-amber-50 to-white dark:from-slate-800 dark:to-slate-900 p-6 rounded-xl shadow-sm border border-amber-100 dark:border-slate-700 flex flex-col">
           <div className="flex items-center gap-2 mb-4">
             <div className="p-2 bg-amber-100 dark:bg-slate-700 rounded-lg text-amber-600 dark:text-amber-400">
@@ -344,34 +410,6 @@ export const Dashboard: React.FC<DashboardProps> = ({ sales, expenses, products,
             {analyzing ? <Loader2 className="animate-spin w-4 h-4"/> : <Sparkles className="w-4 h-4 text-amber-400" />}
             {analyzing ? t('dash_ai_analyzing', lang) : t('dash_ai_btn', lang)}
           </button>
-        </div>
-      </div>
-
-      <div className="bg-white dark:bg-slate-800 rounded-xl shadow-sm border border-slate-200 dark:border-slate-700 overflow-hidden">
-        <div className="p-6 border-b border-slate-100 dark:border-slate-700 flex justify-between items-center">
-            <h3 className="font-bold text-lg text-slate-800 dark:text-white flex items-center gap-2">
-                <Calendar className="text-blue-600" size={20}/> {t('dash_calendar', lang)}
-            </h3>
-            <div className="flex items-center gap-4">
-                <span className="text-slate-900 dark:text-white font-bold capitalize w-32 text-center">
-                    {lang === 'es' ? monthNames[currentMonth.getMonth()] : monthNamesEn[currentMonth.getMonth()]} {currentMonth.getFullYear()}
-                </span>
-                <div className="flex gap-1">
-                    <button onClick={prevMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"><ChevronLeft size={20}/></button>
-                    <button onClick={nextMonth} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-lg text-slate-600 dark:text-slate-300"><ChevronRight size={20}/></button>
-                </div>
-            </div>
-        </div>
-        
-        <div className="p-6">
-            <div className="grid grid-cols-7 gap-px mb-2 text-center">
-                {(lang === 'es' ? dayNames : dayNamesEn).map(d => (
-                    <div key={d} className="text-xs font-bold text-slate-400 uppercase pb-2">{d}</div>
-                ))}
-            </div>
-            <div className="grid grid-cols-7 gap-px bg-slate-200 dark:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-                {renderCalendar()}
-            </div>
         </div>
       </div>
 

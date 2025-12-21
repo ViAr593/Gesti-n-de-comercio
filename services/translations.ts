@@ -29,6 +29,7 @@ export const translations = {
     dash_period_week: "Semana",
     dash_period_month: "Mes",
     dash_chart_title: "Flujo de Caja",
+    dash_category_title: "Ventas por Categoría",
     dash_ai_title: "Consejero IA",
     dash_ai_btn: "Analizar Balance",
     dash_ai_analyzing: "Analizando...",
@@ -122,6 +123,7 @@ export const translations = {
     dash_period_week: "Week",
     dash_period_month: "Month",
     dash_chart_title: "Cash Flow",
+    dash_category_title: "Sales by Category",
     dash_ai_title: "AI Advisor",
     dash_ai_btn: "Analyze Balance",
     dash_ai_analyzing: "Analyzing...",
@@ -188,8 +190,13 @@ export const translations = {
     set_btn_save: "Save Settings",
     set_saved: "Changes saved",
   }
-};
+} as const;
 
-export const t = (key: keyof typeof translations.es, lang: Language = 'es'): string => {
-  return translations[lang][key] || translations['es'][key] || key;
+/**
+ * Translates a key based on the provided language.
+ * Accepts string | Language to be resilient against callers where lang might be inferred as string.
+ */
+export const t = (key: keyof typeof translations.es, lang: string | Language = 'es'): string => {
+  const l: Language = (lang === 'en' || lang === 'es') ? lang : 'es';
+  return (translations[l] as any)[key] || (translations['es'] as any)[key] || key;
 };
