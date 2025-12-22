@@ -14,12 +14,6 @@ interface SidebarProps {
 
 export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, businessConfig, currentUser, lang = 'es' }) => {
   
-  // Mapping ViewState to ModuleScope for permission checking
-  const getModuleFromView = (view: string): ModuleScope => {
-    if (view === 'DASHBOARD') return 'SALES_HISTORY'; 
-    return view as ModuleScope;
-  };
-
   const menuItems = [
     { id: 'DASHBOARD', label: t('menu_dashboard', lang), icon: LayoutDashboard, module: 'SALES_HISTORY' },
     { id: 'POS', label: t('menu_pos', lang), icon: ShoppingCart, module: 'POS' },
@@ -34,7 +28,6 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, business
     { id: 'SETTINGS', label: t('menu_settings', lang), icon: Settings, module: 'SETTINGS' },
   ];
 
-  // Filter items based on permissions
   const visibleItems = menuItems.filter(item => {
     if (item.id === 'DASHBOARD') return true; 
     return hasPermission(currentUser, item.module as ModuleScope, 'view');
@@ -43,12 +36,16 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, business
   return (
     <div className="w-64 bg-white border-r border-slate-200 text-slate-800 flex flex-col h-screen fixed left-0 top-0 shadow-lg z-10 hidden md:flex">
       <div className="p-6 flex items-center space-x-3 border-b border-slate-100">
-        <div className="bg-amber-400 p-2 rounded-lg">
-          <Store className="w-6 h-6 text-slate-900" />
+        <div className="w-10 h-10 rounded-lg overflow-hidden flex items-center justify-center bg-slate-50 border border-slate-200 shadow-sm">
+          {businessConfig?.logo ? (
+            <img src={businessConfig.logo} alt="Logo" className="w-full h-full object-cover" />
+          ) : (
+            <Store className="w-6 h-6 text-slate-400" />
+          )}
         </div>
         <div>
-          <span className="text-xl font-bold tracking-tight block leading-none">GestorPro</span>
-          <span className="text-xs text-slate-500 font-medium">Business Control</span>
+          <span className="text-xl font-bold tracking-tight block leading-none text-slate-900">{businessConfig?.name || 'ViAr'}</span>
+          <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest mt-1 block">Gestión Digital</span>
         </div>
       </div>
       
@@ -62,11 +59,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, business
               onClick={() => setView(item.id as ViewState)}
               className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-all duration-200 ${
                 isActive 
-                  ? 'bg-amber-50 text-amber-700 border border-amber-200 shadow-sm' 
+                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-100 shadow-sm font-bold' 
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
               }`}
             >
-              <Icon className={`w-5 h-5 ${isActive ? 'text-amber-600' : 'text-slate-400'}`} />
+              <Icon className={`w-5 h-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
               <span className="font-medium">{item.label}</span>
             </button>
           );
@@ -75,17 +72,13 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentView, setView, business
 
       <div className="p-4 border-t border-slate-100 bg-slate-50">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold overflow-hidden flex-shrink-0">
-            {businessConfig?.logo ? (
-                <img src={businessConfig.logo} alt="Logo" className="w-full h-full object-cover"/>
-            ) : (
-                "GP"
-            )}
+          <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-600 text-xs font-bold overflow-hidden flex-shrink-0">
+             {currentUser?.name.charAt(0) || 'U'}
           </div>
           <div className="overflow-hidden flex-1 min-w-0">
-            <p className="text-sm font-semibold text-slate-700 truncate">{businessConfig?.name || 'Mi Negocio'}</p>
-            <p className="text-xs text-slate-500 truncate">
-               {currentUser?.role === 'GERENTE_GENERAL' ? 'Gerente' : currentUser?.role.replace('_', ' ')}
+            <p className="text-sm font-semibold text-slate-700 truncate">{currentUser?.name || 'Usuario'}</p>
+            <p className="text-[10px] text-slate-500 truncate uppercase font-medium">
+               {currentUser?.role.replace('_', ' ') || 'Sesión'}
             </p>
           </div>
         </div>

@@ -13,11 +13,10 @@ const KEYS = {
   LOGS: 'gp_db_inventory_logs',
 };
 
-// Hashes pre-calculados para las contraseñas por defecto (SHA-256)
-// admin@123* -> e6053eb8d35e02ae40beeeacef203c1d6492302747072efd6d712476d594b597
-// user@123*  -> 553e87742d4f5556a31c6a28189601d332617f6952865918731b9d4791523498
+// Logotipo ViAr en Base64 (SVG optimizado para carga rápida)
+const VIAR_LOGO = "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTAwIiBoZWlnaHQ9IjUwMCIgdmlld0JveD0iMCAwIDUwMCA1MDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MDAiIGhlaWdodD0iNTAwIiBmaWxsPSIjRThFOUUxIi8+CjxwYXRoIGQ9Ik0yMTAgMTYwQzIxMCAxNjAgMjQwIDE5MCAyNDAgMjQwQzI0MCAyOTAgMjEwIDMzMCAyMTAgMzMwQzIxMCAzMzAgMTgwIDI5MCAxODAgMjQwQzE4MCAxOTAgMjEwIDE2MCAyMTAgMTYwWiIgZmlsbD0iIzVFN0E1RSIvPgo8cGF0aCBkPSJNMjQwIDI0MEMyNDAgMjQwIDI3MCAyMTAgMzAwIDIxMEMzMzAgMjEwIDM2MCAyNDAgMzYwIDI0MEMzNjAgMjQwIDMzMCAyNzAgMzAwIDI3MEMyNzAgMjcwIDI0MCAyNDAgMjQwIDI0MFoiIGZpbGw9IiM1RTdBNUUiLz4KPHRleHQgeD0iNTAiIHk9IjM1MCIgZmlsbD0iIzVFN0E1RSIgc3R5bGU9ImZvbnQtZmFtaWx5OnNlcmlmOyBmb250LXNpemU6MTYwcHg7IGZvbnQtd2VpZ2h0OmJvbGQ7Ij5WaUFyPC90ZXh0Pgo8L3N2Zz4=";
 
-// Datos Semilla (Initial/Seed Data) para cuando la app inicia por primera vez
+// Datos Semilla (Initial/Seed Data)
 const SEED_DATA = {
   products: [
     { 
@@ -35,8 +34,8 @@ const SEED_DATA = {
     },
     { 
       id: '2', 
-      name: 'Coca Cola 500ml', 
-      description: 'Refresco sabor cola original', 
+      name: 'Refresco Orgánico 500ml', 
+      description: 'Bebida natural sin conservantes', 
       price: 1.50, 
       cost: 0.80, 
       stock: 48, 
@@ -45,30 +44,15 @@ const SEED_DATA = {
       supplierId: 's1', 
       measurementUnit: 'ML', 
       measurementValue: 500 
-    },
-    { 
-      id: '3', 
-      name: 'Arroz Premium Grano Largo', 
-      description: 'Bolsa de 1kg calidad superior', 
-      price: 2.20, 
-      cost: 1.10, 
-      stock: 100, 
-      minStock: 20, 
-      category: 'Abarrotes', 
-      supplierId: 's2', 
-      measurementUnit: 'KG', 
-      measurementValue: 1 
     }
   ] as Product[],
 
   suppliers: [
-    { id: 's1', name: 'Distribuidora Central', contactName: 'Carlos Ruiz', phone: '555-0101', email: 'ventas@distcentral.com' },
-    { id: 's2', name: 'Importaciones Globales', contactName: 'Ana Campos', phone: '555-0202', email: 'ana@globalimport.com' }
+    { id: 's1', name: 'Distribuidora Central', contactName: 'Carlos Ruiz', phone: '555-0101', email: 'ventas@distcentral.com' }
   ] as Supplier[],
 
   customers: [
-    { id: 'c1', name: 'Consumidor Final', taxId: '00000000', email: '', phone: '', address: '' },
-    { id: 'c2', name: 'Empresa Ejemplo S.A.', taxId: '20123456789', email: 'contacto@empresa.com', phone: '555-9000', address: 'Av. Empresarial 100' }
+    { id: 'c1', name: 'Consumidor Final', taxId: '00000000', email: '', phone: '', address: '' }
   ] as Customer[],
 
   employees: [
@@ -79,34 +63,25 @@ const SEED_DATA = {
       phone: '999-000-000', 
       email: 'admin@sistema.com', 
       password: 'e6053eb8d35e02ae40beeeacef203c1d6492302747072efd6d712476d594b597' // admin@123* (Hashed)
-    },
-    { 
-      id: 'e2', 
-      name: 'Vendedor Tienda 1', 
-      role: 'VENDEDOR', 
-      phone: '999-111-111', 
-      email: 'vendedor@sistema.com', 
-      password: '553e87742d4f5556a31c6a28189601d332617f6952865918731b9d4791523498' // user@123* (Hashed)
     }
   ] as Employee[],
 
   sales: [] as Sale[],
-  
   expenses: [] as Expense[],
-  
   quotations: [] as Quotation[],
 
   config: {
-    name: 'Mi Negocio Local',
+    name: 'ViAr',
     taxId: '123456789001',
-    address: 'Dirección Principal #123',
-    phone: '555-0000',
-    email: 'contacto@negocio.com',
-    whatsapp: '5550000', // Default Whatsapp
-    receiptMessage: '¡Gracias por su compra!',
+    address: 'Av. Ecológica 456',
+    phone: '555-9876',
+    email: 'contacto@viar.com',
+    whatsapp: '5559876',
+    receiptMessage: 'Gracias por preferir ViAr - Calidad Natural.',
     currencySymbol: '$',
     theme: 'light',
     language: 'es',
+    logo: VIAR_LOGO,
     openingHours: {
         monday: { isOpen: true, open: '09:00', close: '18:00' },
         tuesday: { isOpen: true, open: '09:00', close: '18:00' },
@@ -138,9 +113,6 @@ function save<T>(key: string, data: T): void {
   }
 }
 
-/**
- * Función segura para hashear contraseñas usando SHA-256 (Web Crypto API)
- */
 export const hashPassword = async (text: string): Promise<string> => {
   const msgBuffer = new TextEncoder().encode(text);
   const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
@@ -149,7 +121,6 @@ export const hashPassword = async (text: string): Promise<string> => {
   return hashHex;
 };
 
-// Objeto DB exportado
 export const db = {
   products: {
     getAll: () => load<Product[]>(KEYS.PRODUCTS, SEED_DATA.products),
@@ -182,10 +153,11 @@ export const db = {
   config: {
     get: () => {
         const config = load<BusinessConfig>(KEYS.CONFIG, SEED_DATA.config);
-        // Ensure structure for existing users without openingHours or whatsapp
         if (!config.openingHours) config.openingHours = SEED_DATA.config.openingHours;
-        if (config.whatsapp === undefined) config.whatsapp = '';
+        if (config.whatsapp === undefined) config.whatsapp = SEED_DATA.config.whatsapp;
         if (config.language === undefined) config.language = 'es';
+        if (!config.logo) config.logo = VIAR_LOGO;
+        if (config.name === 'Mi Negocio Local') config.name = 'ViAr';
         return config;
     },
     set: (data: BusinessConfig) => save(KEYS.CONFIG, data),
